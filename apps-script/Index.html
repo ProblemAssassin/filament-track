@@ -13,6 +13,7 @@ window.addEventListener('message',event=>{
   if(data.type==='tracker-hello'){send({type:'tracker-ready',connectionUrl:CONNECTION_URL});return;}
   if(data.type!=='tracker-request'||typeof data.id!=='string'||!data.request||!['list','mutate','receipt'].includes(data.request.method))return;
   clearInterval(announcer);
+  send({type:'tracker-accepted',id:data.id});
   google.script.run.withSuccessHandler(result=>send({type:'tracker-response',id:data.id,result})).withFailureHandler(error=>send({type:'tracker-response',id:data.id,error:error.message||'Google Sheets request failed.'})).trackerApi(data.request);
 });
 function check(){
