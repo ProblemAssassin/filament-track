@@ -22,7 +22,7 @@ export function parseLabel(text) {
   const brand = brands.find(([,r])=>r.test(raw))?.[0] || '';
   const weight = raw.match(/\b(\d+(?:\.\d+)?)\s*(kg|g)\b/i);
   const diameter = raw.match(/\b(1[.,]75|2[.,]85|3[.,]00)\s*(?:mm)?\b/i);
-  const filamentCode = raw.match(/(?:filament\s*code|colour\s*code|color\s*code)[^\d]{0,12}(\d{4,8})/i)?.[1] || '';
+  const filamentCode = raw.match(/(?:(?:filament|lament)\s*code|colour\s*code|color\s*code)[^\d]{0,12}(\d{4,8})/i)?.[1] || '';
   const sku = raw.match(/\bSKU\s*[:：]?\s*([A-Z0-9][A-Z0-9._-]{3,100})/i)?.[1] || '';
   const barcode=(raw.match(/\b\d{13}\b/g)||[]).find(validEan13)||'';
   return {material:type,colour,brand,weight:weight ? Number(weight[1])*(weight[2].toLowerCase()==='kg'?1000:1):'',diameter:diameter?diameter[1].replace(',','.'): '',filamentCode,sku,barcode,variant:/SPLFREE|REFILL|SPOOL[ -]?FREE/i.test(raw)?'Refill':'',location:'',raw};
