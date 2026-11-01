@@ -29,3 +29,22 @@ test('server rejects unauthorised users and invalid fields',()=>{const e=environ
 test('journal formula-like input is stored as text',()=>{const e=environment();e.context.trackerApi(request({material:'PLA',colour:'=IMPORTXML("evil")',brand:'Test',weight:1000,diameter:1.75}));const row=e.sheets.get('Tracker Journal').rows.at(-1);assert.equal(row[5],"'=IMPORTXML(\"evil\")");});
 test('journal corruption is surfaced, never silently converted to empty stock',()=>{const e=environment();e.sheets.get('Tracker Journal').rows[1][16]=99;assert.throws(()=>e.context.trackerApi({method:'list'}),/mismatch/);});
 test('the journal grows past its initial row capacity',()=>{const e=environment(),journal=e.sheets.get('Tracker Journal');journal.maxRows=journal.rows.length;const p=e.context.trackerApi({method:'list'}).products[0];e.context.trackerApi(request(p));assert.ok(journal.maxRows>journal.rows.length);});
+test('normal save reads the journal once and writes inventory values without repeated formatting',()=>{
+ const e=environment(),p=e.context.trackerApi({method:'list'}).products[0],journal=e.sheets.get('Tracker Journal'),inventory=e.sheets.get('Tracker Inventory');let reads=0,writes=0;
+ const read=journal.getDataRange.bind(journal);journal.getDataRange=()=>{reads++;return read();};
+ const range=inventory.getRange.bind(inventory);inventory.getRange=(row,...args)=>{assert.equal(row,2,'Only inventory data should be rewritten');writes++;return range(row,...args);};
+ for(const method of ['setFrozenRows','setColumnWidths','setColumnWidth','getFilter'])inventory[method]=()=>{throw new Error('Unnecessary layout operation: '+method);};
+ const saved=e.context.trackerApi(request(p));assert.equal(reads,1);assert.equal(writes,1);assert.equal(saved.warning,'');assert.equal(saved.state.products[0].storage,2);
+ const fresh=e.context.trackerApi({method:'list'});assert.deepEqual(JSON.parse(JSON.stringify(saved.state.products)),JSON.parse(JSON.stringify(fresh.products)));assert.deepEqual(JSON.parse(JSON.stringify(saved.state.events)),JSON.parse(JSON.stringify(fresh.events)));
+});
+test('a mirror failure still returns a durable receipt and retry does not append twice',()=>{
+ const e=environment(),p=e.context.trackerApi({method:'list'}).products[0],operation=request(p);
+ e.sheets.get('Tracker Inventory').getRange=()=>{throw new Error('Inventory view unavailable');};
+ const saved=e.context.trackerApi(operation);assert.match(saved.warning,/Saved in the journal/);assert.equal(saved.state.products[0].storage,2);
+ assert.equal(e.context.trackerApi(operation).replayed,true);assert.equal(e.context.trackerApi({method:'receipt',requestId:operation.requestId}).event.balance,2);
+});
+test('a failure during flush is recovered by retrying the same transaction ID',()=>{
+ const e=environment(),p=e.context.trackerApi({method:'list'}).products[0],operation=request(p);
+ e.context.SpreadsheetApp.flush=()=>{throw new Error('Lost confirmation');};assert.throws(()=>e.context.trackerApi(operation),/Lost confirmation/);
+ e.context.SpreadsheetApp.flush=()=>{};const result=e.context.trackerApi(operation);assert.equal(result.replayed,true);assert.equal(result.state.products[0].storage,2);
+});
