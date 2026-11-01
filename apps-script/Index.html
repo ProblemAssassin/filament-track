@@ -4,7 +4,7 @@
 const APP_ORIGIN = <?!= JSON.stringify(appOrigin) ?>;
 const APP_URL = <?!= JSON.stringify(appUrl) ?>;
 const CONNECTION_URL = <?!= JSON.stringify(connectionUrl) ?>;
-let clientWindow=null,channel='';
+let clientWindow=null,channel='',announcer=null;
 function send(value){if(clientWindow&&!clientWindow.closed)clientWindow.postMessage({...value,channel},APP_ORIGIN);}
 window.addEventListener('message',event=>{
   if(event.origin!==APP_ORIGIN||event.source!==clientWindow)return;
@@ -12,6 +12,7 @@ window.addEventListener('message',event=>{
   if(!data||data.channel!==channel)return;
   if(data.type==='tracker-hello'){send({type:'tracker-ready',connectionUrl:CONNECTION_URL});return;}
   if(data.type!=='tracker-request'||typeof data.id!=='string'||!data.request||!['list','mutate','receipt'].includes(data.request.method))return;
+  clearInterval(announcer);
   google.script.run.withSuccessHandler(result=>send({type:'tracker-response',id:data.id,result})).withFailureHandler(error=>send({type:'tracker-response',id:data.id,error:error.message||'Google Sheets request failed.'})).trackerApi(data.request);
 });
 function check(){
@@ -24,7 +25,9 @@ function check(){
 }
 document.getElementById('check').addEventListener('click',check);check();
 document.getElementById('open').addEventListener('click',()=>{
-  channel=crypto.randomUUID();clientWindow=window.open(APP_URL+'#bridge='+channel,'filamenttrack-'+channel);
+  clearInterval(announcer);channel=crypto.randomUUID();clientWindow=window.open(APP_URL+'#bridge='+channel+'&googleOrigin='+encodeURIComponent(location.origin),'filamenttrack-'+channel);
+  let attempts=0;
+  announcer=setInterval(()=>{if(++attempts>90||!clientWindow||clientWindow.closed){clearInterval(announcer);return;}send({type:'tracker-ready',connectionUrl:CONNECTION_URL});},500);
   document.getElementById('status').textContent=clientWindow?'Connected app opened. Keep this Google tab open in the background.':'Your browser blocked the new tab. Allow this opening and try again.';
 });
 </script></body></html>
