@@ -29,7 +29,7 @@ Date: 1 November 2026 (Singapore time).
 | Scan another | Fixture browser test saved one roll, retained Add mode, incremented the session tally, and reset the previous detection. |
 | Live persistence | A real +1 followed by -1 was saved through the deployed app; original stock was restored and both events appeared in the activity log. |
 | Page refresh | The connected app reconnected and loaded the saved stock after a browser refresh. |
-| Publication | Public GitHub repository and HTTPS GitHub Pages site deployed. Private backend version 10 deployed. |
+| Publication | Public GitHub repository and HTTPS GitHub Pages site deployed. Private backend version 11 deployed. |
 
 Run the automated audit with:
 
@@ -78,7 +78,7 @@ An unfamiliar barcode with incomplete product details now shows a dedicated Scan
 
 Eight scan-flow tests exercise the actual app handlers with a lightweight DOM and simulated scanner/bridge callbacks, including new/known codes, label photos, retakes, manual fallback, Use, alias conflicts, package-size mismatches and save/continue. They also exercise the actual scanner’s live-loop and Read label branches with controlled frames/OCR to verify barcode bypass. An additional test exercises the actual backend source against mocked Google services to verify atomic tagging, one-roll accounting and retry idempotency. All 34 automated tests pass. No live inventory was changed for this update. Physical camera behaviour and visual layout of the new prompt still require browser/device verification; local browser control was unavailable. The private backend deployment remains version 10.
 
-## Save-performance update — frontend released, backend deployment pending
+## Save-performance update — deployed as version 11
 
 The frontend recovery button now sends the original transaction directly, replacing receipt lookup followed by a separate retry. The existing idempotent backend either returns its saved receipt or commits that same request once. Slow requests display progress after six seconds. Updated launcher source acknowledges receipt immediately so the frontend can distinguish delivery from Google processing. Timed-out mutations retain their message listener for five minutes and can complete automatically on a late valid confirmation. Pending local storage remains the fallback after closure or expiry. Stock is never optimistically marked as saved.
 
@@ -86,4 +86,6 @@ Prepared Apps Script changes remove the second full-journal read after a flushed
 
 Eight additional automated tests cover one journal read and one inventory data write with no layout operations, returned-state equivalence to a fresh journal read, mirror failure, flush failure/replay, progress acknowledgements, late replies, listener expiry, one-call recovery and automatic late completion. All 42 tests pass. These checks use the actual source with mocked Google services or controlled browser adapters. No wall-clock speedup is claimed from mock timings.
 
-The frontend files and prepared backend source are published in the repository. The live Google backend remains version 10: browser control continued to report disabled despite the user enabling access, and the fallback editor connection timed out. Therefore the backend optimisation and launcher acknowledgement are not yet live. The frontend works with version 10. No live Sheet writes or signed-in performance measurements were performed for this update. Google cold starts, network latency and phone background-tab suspension remain possible delays.
+The frontend and backend source are published in the repository. On 1 November 2026 at 15:36 SGT, the existing private deployment was successfully updated to version 11, described as FilamentTrack 1.1 - faster saves and request acknowledgements. The app URL stayed the same. Execute as User accessing the web app and Only myself access were verified before deployment. Desktop control worked after the user restarted Chrome, allowing both tested source files to be saved and the deployment completed.
+
+The deployed launcher connected to the private inventory, and its connected frontend loaded the original one-product, one-roll balance. A real Add changed stock 1 → 2; a real Use restored 2 → 1. Both displayed Google received this roll while saving and completed without a separate receipt-check step. Completion was visible by the next observations, approximately 9.2 and 9.3 seconds after initiating each click, including automation/input/observation overhead. These are coarse desktop observation bounds, not precise RPC latency measurements or a before/after speed benchmark. Phone timings remain unmeasured. A journal-backed refresh also confirmed the restored balance. Google cold starts, network latency and phone background-tab suspension remain possible delays.
