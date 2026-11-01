@@ -174,6 +174,7 @@ async function resolvePending(){
     }
   }catch(e){$('pending-text').textContent=e.message;$('save-error').textContent=e.message;$('save-error').hidden=false;}finally{$('resolve-pending').disabled=false;$('check-save').disabled=false;}
 }
+document.querySelector('.brand').addEventListener('click',event=>{event.preventDefault();window.scrollTo(0,0);});
 $('add-button').addEventListener('click',()=>openSession('ADD'));$('use-button').addEventListener('click',()=>openSession('USE'));
 $('close-scan').addEventListener('click',()=>$('scan-dialog').close());
 $('scan-dialog').addEventListener('cancel',e=>{if(state.saving)e.preventDefault();});
