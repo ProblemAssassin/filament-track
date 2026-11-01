@@ -14,7 +14,7 @@ Date: 1 November 2026 (Singapore time).
 
 | Check | Evidence / result |
 | --- | --- |
-| Automated tests | 21 passing tests across core, backend and connection suites. |
+| Automated tests | 25 passing tests across core, backend, connection and account-routing suites. |
 | Opening-stock migration | Setup imports the existing records once. Original inventory and transaction tabs remain intact. |
 | Duplicate submission / retry | Replaying a request ID produces one committed event. Reusing it with different content is rejected. |
 | Stock protection | The last roll reaches zero; another Use is rejected. Unknown products cannot be deducted. |
@@ -34,7 +34,7 @@ Date: 1 November 2026 (Singapore time).
 Run the automated audit with:
 
 ```sh
-node --test tests/core.test.mjs tests/backend.test.mjs tests/bridge.test.mjs
+node --test tests/*.test.mjs
 ```
 
 The backend tests use a mock of Google services and exercise the actual Apps Script source. The browser fixture is explicitly labelled and makes no real Sheet writes. Live persistence was separately checked through the production Google connection; fixture results are not presented as live-provider tests.
@@ -65,3 +65,9 @@ The photographs were processed in the browser. They were not copied into the rep
 - The app tracks whole rolls in storage, not grams consumed during printing.
 - Do not manually edit generated journal balances. It is a small personal inventory service, not a load-tested multi-user warehouse system.
 - This audit is a code, behaviour and deployment review, not an independent penetration test or a guarantee of recognition accuracy on every label.
+
+## Account-routing update
+
+The frontend connection button now opens Google’s account chooser before continuing to the validated private Apps Script deployment. Pasted `/macros/u/5/s/…/exec` links are accepted and normalized to `/macros/s/…/exec`; query parameters and fragments, including session-specific account hints, are removed. Owner-only backend access remains unchanged. No account identity or deployment identifier was added to public source.
+
+Four additional automated checks cover copied-link normalization, the chooser’s continuation target, rejecting unsafe destinations, and browser storage. This update was verified with automated tests and the published source. The signed-in account chooser and return flow were not browser-tested for this update because local browser control was disabled in Work settings. Google’s documented multi-login limitation can still require an Incognito tab signed in only to the owning account.
