@@ -8,7 +8,7 @@ Node.js 22 or later; no package installation is needed.
 
 ```sh
 node tests/serve.mjs
-node --test tests/core.test.mjs tests/backend.test.mjs
+node --test tests/core.test.mjs tests/backend.test.mjs tests/bridge.test.mjs
 ```
 
 For isolated UI tests, use `node tests/serve.mjs --fixture`. The header says **QA fixture · no Sheet writes**. That mode substitutes mock modules only in the local server; GitHub Pages always serves the real modules. `tests/scanner-harness.html` tests recognition on a selected local image without changing inventory.
