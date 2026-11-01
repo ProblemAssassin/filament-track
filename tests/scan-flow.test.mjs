@@ -6,7 +6,7 @@ import crypto from 'node:crypto';
 import * as core from '../core.js';
 import {LabelScanner} from '../scanner.js';
 
-const source=fs.readFileSync(new URL('../app.js',import.meta.url),'utf8').replace(/^import[^\n]*\n/gm,'')+'\nthis.flow={state,scanner,bridge,resetDraft,received,scanMaterialLabel,saveRoll};';
+const source=fs.readFileSync(new URL('../app.js',import.meta.url),'utf8').replace(/^import[^\n]*\n/gm,'')+'\nthis.flow={state,scanner,bridge,resetDraft,received,scanMaterialLabel,saveRoll,lateSaveResult};';
 const barcode='6975337030270';
 const label='Bambu Lab PLA Basic Red Filament Code 10200';
 const red={id:'red',material:'PLA Basic',colour:'Red',brand:'Bambu Lab',weight:750,diameter:2.85,variant:'Refill',barcode:'',sku:'',filamentCode:'10200',storage:1};
@@ -27,11 +27,13 @@ function environment(products=[],mode='ADD'){
     constructor(){this.calls=[];}connect(){}
     async call(request){
       this.calls.push(request);assert.equal(request.method,'mutate');
+      if(this.receipt?.event.requestId===request.requestId)return this.receipt;
       const p={...request.product,id:request.product.id||'new-product'};
       const previous=flow.state.products.find(x=>x.id===p.id);p.storage=(previous?.storage||0)+(request.mode==='ADD'?1:-1);
       const products=[...flow.state.products.filter(x=>x.id!==p.id),p];
       const event={requestId:request.requestId,material:p.material,colour:p.colour,source:request.source,mode:request.mode,delta:request.mode==='ADD'?1:-1,balance:p.storage,timestamp:new Date().toISOString()};
-      return {ok:true,event,state:{ok:true,products,events:[event],updatedAt:new Date().toISOString()}};
+      const result={ok:true,event,state:{ok:true,products,events:[event],updatedAt:new Date().toISOString()}};
+      this.receipt=result;if(this.loseNextReply){this.loseNextReply=false;throw new Error('Reply timed out');}return result;
     }
   }
   const storage=new Map();
@@ -99,4 +101,15 @@ test('label-only live scan and Read label bypass barcode detection and deliver O
     if(action==='loop')await scanner.loop(scanner.generation);else await scanner.capture();
     assert.equal(results.length,1);assert.equal(results[0].text,label);assert.equal(results[0].source,'Label');
   }
+});
+test('Finish / check save confirms or retries the same operation in one call',async()=>{
+ const e=environment([{...red,barcode}]);e.received({code:barcode,source:'Barcode'});e.bridge.loseNextReply=true;await e.click('ok-button');
+ assert.equal(e.bridge.calls.length,1);assert.equal(e.state.products[0].storage,1);
+ await e.click('resolve-pending');assert.equal(e.bridge.calls.length,2);assert.equal(e.bridge.calls[0].requestId,e.bridge.calls[1].requestId);
+ assert.equal(e.state.products[0].storage,2);assert.equal(e.state.session,1);assert.equal(e.element('pending-notice').hidden,true);
+});
+test('late confirmation completes the original save automatically without another server call',async()=>{
+ const e=environment([{...red,barcode}]);e.received({code:barcode,source:'Barcode'});e.bridge.loseNextReply=true;await e.click('next-button');
+ const operation=e.bridge.calls[0],receipt=e.bridge.receipt;await e.lateSaveResult(operation,receipt);await e.lateSaveResult(operation,receipt);
+ assert.equal(e.bridge.calls.length,1);assert.equal(e.state.products[0].storage,2);assert.equal(e.state.session,1);assert.equal(e.state.lastBarcode,'');assert.equal(e.element('pending-notice').hidden,true);
 });
