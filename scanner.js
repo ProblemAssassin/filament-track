@@ -19,7 +19,7 @@ function cropPaper(image){
   const crop=document.createElement('canvas');crop.width=Math.round(width);crop.height=Math.round(height);crop.getContext('2d').drawImage(image,x,y,width,height,0,0,crop.width,crop.height);return crop;
 }
 export class LabelScanner {
-  constructor(video,onResult,onProgress,onCamera){this.video=video;this.onResult=onResult;this.progress=onProgress;this.onCamera=onCamera;this.stream=null;this.running=false;this.held=false;this.busy=false;this.generation=0;this.workerPromise=null;this.lastOcr=0;this.reader=null;this.autoOcr=true;}
+  constructor(video,onResult,onProgress,onCamera){this.video=video;this.onResult=onResult;this.progress=onProgress;this.onCamera=onCamera;this.stream=null;this.running=false;this.held=false;this.busy=false;this.generation=0;this.workerPromise=null;this.lastOcr=0;this.reader=null;this.autoOcr=true;this.labelOnly=false;}
   async start(){
     await this.stop();const generation=++this.generation;this.held=false;
     if(!window.isSecureContext||!navigator.mediaDevices?.getUserMedia)throw new Error('Live camera needs HTTPS and a supported browser. You can still take or upload a photo.');
@@ -59,7 +59,7 @@ export class LabelScanner {
     if(this.busy){this.timer=setTimeout(()=>this.loop(generation),500);return;}
     this.busy=true;
     try{
-      const canvas=this.frame();let code=await this.decode(canvas);
+      const canvas=this.frame();let code=this.labelOnly?'':await this.decode(canvas);
       if(generation!==this.generation||this.held)return;
       if(code){this.hold();this.onResult({code,source:'Barcode',image:canvas.toDataURL('image/jpeg',.8)});return;}
       if(this.autoOcr&&Date.now()-this.lastOcr>4500){
@@ -75,7 +75,7 @@ export class LabelScanner {
   async capture(){
     if(this.busy)throw new Error('Reading is already in progress. Wait for the result.');
     this.hold();this.busy=true;const generation=this.generation;
-    try{const canvas=this.frame();const code=await this.decode(canvas);const text=await this.read(canvas);if(generation!==this.generation)return;this.onResult({code,text,source:text?'Label':'Barcode',image:canvas.toDataURL('image/jpeg',.8)});}
+    try{const canvas=this.frame();const code=this.labelOnly?'':await this.decode(canvas);const text=await this.read(canvas);if(generation!==this.generation)return;this.onResult({code,text,source:text?'Label':'Barcode',image:canvas.toDataURL('image/jpeg',.8)});}
     catch(e){if(generation===this.generation)this.resume();throw e;}finally{this.busy=false;}
   }
   async photo(file){
@@ -93,7 +93,7 @@ export class LabelScanner {
         if(generation!==this.generation)return;
         const swap=angle%180!==0,width=swap?label.height:label.width,height=swap?label.width:label.height,scale=Math.min(1,2400/Math.max(width,height));
         const canvas=document.createElement('canvas');canvas.width=Math.round(width*scale);canvas.height=Math.round(height*scale);const ctx=canvas.getContext('2d');ctx.translate(canvas.width/2,canvas.height/2);ctx.rotate(angle*Math.PI/180);ctx.drawImage(label,-label.width*scale/2,-label.height*scale/2,label.width*scale,label.height*scale);
-        code ||= await this.decode(canvas);
+        if(!this.labelOnly)code ||= await this.decode(canvas);
         const text=await this.read(canvas),parsed=parseLabel(text),score=Number(!!parsed.material)*4+Number(!!parsed.colour)*4+Number(!!parsed.brand)*2+Number(!!parsed.filamentCode)+Number(!!parsed.sku);
         if(score>best.score)best={text,score,canvas};
         if(score>=10||code&&score<4)break;
