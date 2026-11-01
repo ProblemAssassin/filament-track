@@ -28,6 +28,7 @@ Date: 1 November 2026 (Singapore time).
 | Add / Use UI | Confirmed in isolated fixture mode and against the real private Google Sheet. Buttons disable while saving. |
 | Scan another | Fixture browser test saved one roll, retained Add mode, incremented the session tally, and reset the previous detection. |
 | Live persistence | A real +1 followed by -1 was saved through the deployed app; original stock was restored and both events appeared in the activity log. |
+| Page refresh | The connected app reconnected and loaded the saved stock after a browser refresh. |
 | Publication | Public GitHub repository and HTTPS GitHub Pages site deployed. Private backend version 10 deployed. |
 
 Run the automated audit with:
