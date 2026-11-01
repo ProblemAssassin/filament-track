@@ -1,9 +1,9 @@
 import {GoogleBridge} from './bridge.js';
 import {LabelScanner} from './scanner.js';
-import {clean,findByCode,labelMatches,parseLabel,validateDraft,csvCell} from './core.js';
+import {clean,normal,findByCode,labelMatches,mergeScanDetails,parseLabel,validateDraft,csvCell} from './core.js';
 import {getScriptUrl,saveScriptUrl,googleAccountChooserUrl} from './config.js';
 const $=id=>document.getElementById(id);
-const state={products:[],events:[],connected:false,loaded:false,mode:'ADD',draft:null,source:'Manual',saving:false,session:0,selectedId:'',raw:'',lastBarcode:'',saveResolved:false};
+const state={products:[],events:[],connected:false,loaded:false,mode:'ADD',draft:null,source:'Manual',saving:false,session:0,selectedId:'',raw:'',lastBarcode:'',saveResolved:false,scanDetails:{},readingLabel:false};
 const pendingKey='filament-track-pending-v1';let pending=null;let toastTimer;
 try{pending=JSON.parse(localStorage.getItem(pendingKey)||'null');}catch{}
 const fields=['material','colour','brand','weight','diameter','variant','barcode','sku','filamentCode','location'];
@@ -81,40 +81,70 @@ async function openSession(mode,product){
 }
 function resetDraft(){
   state.draft=null;state.selectedId='';state.source='Manual';state.raw='';state.lastBarcode='';state.saving=false;state.saveResolved=false;
+  state.scanDetails={};state.readingLabel=false;scanner.labelOnly=false;$('label-link-prompt').hidden=true;$('capture-button').textContent='Read label';
   fillFields(blankDraft());lockIdentity(false);$('existing-product').value='';$('product-form').hidden=true;$('detected-product').hidden=true;$('detection-placeholder').hidden=false;$('edit-button').hidden=true;$('detection-status').textContent='READY TO SCAN';$('detection-status').className='badge';$('draft-alert').hidden=true;$('save-error').hidden=true;$('ocr-details').hidden=true;$('capture-preview').hidden=true;$('camera-guide').hidden=false;$('camera-idle').hidden=!!scanner.running;$('camera-paused').hidden=true;$('retake-button').hidden=true;updateSaveButtons();
 }
 function chooseProduct(product,aliases={}){
   state.selectedId=product.id;state.draft={...product};
-  for(const field of ['barcode','sku','filamentCode'])if(aliases[field]&&!product[field])state.draft[field]=aliases[field];
+  for(const field of ['barcode','sku','filamentCode'])if(aliases[field])state.draft[field]=aliases[field];
   fillFields(state.draft);$('existing-product').value=product.id;lockIdentity(true);displayDraft(true);updateSaveButtons();
 }
 function displayDraft(matched=false){
   const p=state.draft;if(!p)return;
-  $('detected-material').textContent=p.material||'Check material';$('detected-description').textContent=[p.colour||'Check colour',p.brand||'Check brand',p.weight?p.weight+' g':'',p.variant&&p.variant!=='Unspecified'?p.variant:''].filter(Boolean).join(' · ');
+  $('detected-material').textContent=p.material||(p.barcode?'New barcode':'Check material');$('detected-description').textContent=[p.colour||'Check colour',p.brand||'Check brand',p.weight?p.weight+' g':'',p.variant&&p.variant!=='Unspecified'?p.variant:''].filter(Boolean).join(' · ');
   $('detected-code').textContent=p.barcode?'Barcode '+p.barcode:p.sku?'SKU '+p.sku:p.filamentCode?'Filament code '+p.filamentCode:'No code linked';
   const before=Number(p.storage||0);$('stock-preview').textContent='Storage '+before+' → '+(before+(state.mode==='ADD'?1:-1));
   $('detection-placeholder').hidden=true;$('detected-product').hidden=false;$('edit-button').hidden=false;$('detection-status').textContent=matched?'MATCH FOUND · CHECK DETAILS':'CHECK DETECTED DETAILS';$('detection-status').className='badge'+(matched?'':' review');
 }
 function setAlert(message){$('draft-alert').textContent=message;$('draft-alert').hidden=!message;}
+function aliasConflict(product){
+  const existing=state.products.find(p=>p.id===product?.id);if(!existing)return '';
+  const field=['barcode','sku','filamentCode'].find(f=>existing[f]&&product[f]&&normal(existing[f])!==normal(product[f]));
+  return field?'This filament already has a different '+field+'. Check the scanned code or choose a separate filament.':'';
+}
+function prepareLabelScan(){
+  if(state.saving||!state.lastBarcode)return false;
+  state.readingLabel=true;scanner.labelOnly=true;scanner.autoOcr=true;
+  $('label-link-prompt').hidden=true;$('capture-preview').hidden=true;$('camera-paused').hidden=true;$('camera-guide').hidden=false;$('retake-button').hidden=true;$('product-form').hidden=true;
+  $('detection-status').textContent='SCAN MATERIAL LABEL';$('capture-button').textContent='Read material label';
+  setProgress('Barcode kept. Show the material label on the same box, or take/upload its photo. Nothing has been saved.');return true;
+}
+async function scanMaterialLabel(){
+  if(!prepareLabelScan())return;
+  setManual(false);if(scanner.running)scanner.resume();else await startCamera();
+  if(scanner.running)setProgress('Barcode kept. Point at the material label on the same box. We’ll fill the details above for you to verify.');
+}
 function received({code='',text='',source,image}){
   if(!$('scan-dialog').open||state.saving)return;
   scanner.hold();state.source=source;state.raw=text;
   if(image){$('capture-preview').src=image;$('capture-preview').hidden=false;$('camera-idle').hidden=true;$('camera-guide').hidden=true;}$('camera-paused').hidden=false;$('retake-button').hidden=false;
   if(text){$('ocr-text').textContent=text;$('ocr-details').hidden=false;}
-  const read=parseLabel(text),parsed={...blankDraft(),...Object.fromEntries(Object.entries(read).filter(([,v])=>v!=='')),barcode:code||read.barcode||state.lastBarcode};
+  const read=parseLabel(text),detectedCode=code||read.barcode;
+  if(!state.readingLabel&&detectedCode&&state.lastBarcode&&normal(detectedCode)!==normal(state.lastBarcode))state.scanDetails={};
+  const barcode=state.readingLabel?state.lastBarcode:detectedCode||state.lastBarcode;
+  state.scanDetails=mergeScanDetails(state.scanDetails,read,barcode);
+  const parsed={...blankDraft(),...state.scanDetails};
   if(parsed.barcode)state.lastBarcode=parsed.barcode;
-  const exact=findByCode(state.products,parsed.barcode),matches=exact?[exact]:labelMatches(state.products,parsed);
-  if(matches.length===1){chooseProduct(matches[0],parsed);setAlert('Check that this is the right filament. Each confirmation counts one roll.');$('product-form').hidden=true;}
+  const exact=findByCode(state.products,parsed.barcode),matches=exact?[exact]:labelMatches(state.products,state.scanDetails);
+  $('label-link-prompt').hidden=true;
+  if(matches.length===1){chooseProduct(matches[0],parsed);const conflict=aliasConflict(state.draft);setAlert(conflict||(!exact&&parsed.barcode?'Label matches saved filament. Confirm to link this barcode and '+(state.mode==='ADD'?'add':'use')+' one roll.':'Check that this is the right filament. Each confirmation counts one roll.'));$('product-form').hidden=!conflict;}
   else{
     state.selectedId='';state.draft=parsed;fillFields(parsed);lockIdentity(false);displayDraft(false);$('product-form').hidden=false;
-    const defaults=[!read.weight?'weight defaults to 1,000 g':'',!read.diameter?'diameter defaults to 1.75 mm':''].filter(Boolean).join('; ');
+    const defaults=[!state.scanDetails.weight?'weight defaults to 1,000 g':'',!state.scanDetails.diameter?'diameter defaults to 1.75 mm':''].filter(Boolean).join('; ');
     setAlert((matches.length>1?'More than one product matches. Choose the correct existing filament.':state.mode==='USE'?'Choose an existing filament. Unknown products cannot be deducted.':parsed.barcode&&!parsed.material?'New code. Read the material label or enter the details to link it.':'Check the suggested details. Missing fields need your input.')+(defaults?' Not read: '+defaults+'. Verify these values.':''));
   }
-  setProgress('Result held for verification. OK finishes; Scan another saves and continues.');updateSaveButtons();
+  const needsLabel=!!parsed.barcode&&!exact&&matches.length!==1&&(!parsed.material||!parsed.colour||!parsed.brand);
+  if(needsLabel){
+    $('label-link-prompt').hidden=false;$('label-link-code').textContent=parsed.barcode;
+    $('scan-material-label').textContent=state.readingLabel?'Read material label again':'Scan material label';
+    $('detection-status').textContent='NEW BARCODE · LABEL NEEDED';
+    if(!state.readingLabel)$('product-form').hidden=true;
+  }
+  setProgress(needsLabel?'Barcode kept. Scan the material label on the same box to fill its details, or enter them manually.':!exact&&parsed.barcode?'Check the label details. Your confirmation saves this barcode link and counts exactly one roll.':'Result held for verification. OK finishes; Scan another saves and continues.');updateSaveButtons();
 }
 function setManual(manual){
   $('manual-tab').classList.toggle('active',manual);$('manual-tab').setAttribute('aria-pressed',String(manual));$('camera-tab').classList.toggle('active',!manual);$('camera-tab').setAttribute('aria-pressed',String(!manual));
-  if(manual){scanner.hold();$('product-form').hidden=false;if(!state.draft){state.draft=blankDraft();fillFields(state.draft);}setProgress('Choose an existing filament or enter details. Each confirmation counts one roll.');updateSaveButtons();}
+  if(manual){scanner.hold();$('label-link-prompt').hidden=true;$('product-form').hidden=false;if(!state.draft){state.draft=blankDraft();fillFields(state.draft);}setProgress('Choose an existing filament or enter details. Each confirmation counts one roll.');updateSaveButtons();}
 }
 function cameraState(active){$('camera-idle').hidden=active;$('capture-button').disabled=!active;$('start-camera').disabled=false;}
 async function startCamera(){
@@ -125,16 +155,19 @@ async function startCamera(){
 function updateSaveButtons(){
   if(!$('ok-button'))return;
   const p=state.draft?readFields():null;
-  const disabled=state.saving||!state.connected||!p||!!validateDraft(p,state.mode)||!!pending;
+  const conflict=aliasConflict(p);
+  const disabled=state.saving||!state.connected||!p||!!validateDraft(p,state.mode)||!!conflict||!!pending;
+  if(conflict)setAlert(conflict);
   $('ok-button').disabled=disabled;$('next-button').disabled=disabled;
   $('close-scan').disabled=state.saving;$('retake-button').disabled=state.saving;$('edit-button').disabled=state.saving;
+  $('scan-material-label').disabled=state.saving;$('tag-manually').disabled=state.saving;
 }
 function savePending(request){localStorage.setItem(pendingKey,JSON.stringify(request));pending=request;}
 function clearPending(){localStorage.removeItem(pendingKey);pending=null;$('pending-notice').hidden=true;$('check-save').hidden=true;$('check-save').textContent='Check save';$('resolve-pending').textContent='Check save';$('resolve-pending').onclick=resolvePending;}
 function showPending(){$('pending-notice').hidden=!pending;$('check-save').hidden=!pending;if(pending)$('pending-text').textContent=(pending.mode==='ADD'?'Add':'Use')+' 1 '+(pending.product?.material||'filament')+' · '+(pending.product?.colour||'')+'. Check whether Google recorded it before continuing.';updateSaveButtons();}
 async function saveRoll(again){
   if(state.saving||pending)return;
-  const product=readFields(),error=validateDraft(product,state.mode);
+  const product=readFields(),error=validateDraft(product,state.mode)||aliasConflict(product);
   if(error){$('save-error').textContent=error;$('save-error').hidden=false;return;}
   const request={method:'mutate',requestId:crypto.randomUUID(),mode:state.mode,product,source:state.source};
   state.saving=true;scanner.hold();$('save-error').hidden=true;
@@ -183,10 +216,14 @@ $('camera-tab').addEventListener('click',async()=>{setManual(false);if(!scanner.
 $('manual-tab').addEventListener('click',()=>{setManual(true);$('existing-product').focus();});
 $('start-camera').addEventListener('click',startCamera);
 $('capture-button').addEventListener('click',async()=>{try{await scanner.capture();}catch(e){setProgress(e.message);}});
-$('retake-button').addEventListener('click',async()=>{resetDraft();setManual(false);if(scanner.running)scanner.resume();else await startCamera();});
+$('scan-material-label').addEventListener('click',scanMaterialLabel);
+$('tag-manually').addEventListener('click',()=>{setManual(true);$('field-material').focus();});
+$('retake-button').addEventListener('click',async()=>{if(state.readingLabel){await scanMaterialLabel();return;}resetDraft();setManual(false);if(scanner.running)scanner.resume();else await startCamera();});
 $('photo-input').addEventListener('change',async e=>{
   const file=e.target.files?.[0];e.target.value='';if(!file||state.saving)return;
-  const code=state.lastBarcode;resetDraft();state.lastBarcode=code;setProgress('Reading photo on your device…');$('photo-input').disabled=true;$('capture-button').disabled=true;
+  if(state.lastBarcode&&!findByCode(state.products,state.lastBarcode))prepareLabelScan();
+  else{resetDraft();}
+  setProgress('Reading photo on your device…');$('photo-input').disabled=true;$('capture-button').disabled=true;
   try{await scanner.photo(file);}catch(error){setProgress(error.message);}finally{$('photo-input').disabled=false;$('capture-button').disabled=!scanner.running;}
 });
 $('edit-button').addEventListener('click',()=>{$('product-form').hidden=!$('product-form').hidden;});
