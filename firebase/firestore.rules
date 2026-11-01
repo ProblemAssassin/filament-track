@@ -1,0 +1,79 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function owner(uid) {
+      return request.auth != null && request.auth.uid == uid && request.auth.token.email_verified == true
+        && get(/databases/$(database)/documents/owners/$(uid)).data.enabled == true;
+    }
+    function canonical(value) { return value.trim().replace('\\s+', ' ').upper(); }
+    function digest(value) { return hashing.sha256(value).toHexString().lower(); }
+    function identity(p) {return digest(canonical(p.brand)+'|'+canonical(p.material)+'|'+canonical(p.colour)+'|'+string(p.weight)+'|'+string(p.diameter)+'|'+canonical(p.variant));}
+    function text(value,max) {return value is string && value.size() <= max;}
+    function alias(uid,code,id) {
+      return code == '' || (getAfter(/databases/$(database)/documents/users/$(uid)/codes/$(digest(canonical(code)))).data.productId == id
+        && getAfter(/databases/$(database)/documents/users/$(uid)/codes/$(digest(canonical(code)))).data.value == canonical(code));
+    }
+    function productValid(uid,id,p) {
+      return p.keys().hasOnly(['material','colour','brand','weight','diameter','variant','barcode','sku','filamentCode','location','storage','updatedAt','lastRequestId'])
+        && text(p.material,120) && p.material.size()>0 && text(p.colour,120) && p.colour.size()>0 && text(p.brand,120) && p.brand.size()>0
+        && text(p.variant,120) && text(p.barcode,120) && text(p.sku,120) && text(p.filamentCode,120) && text(p.location,160)
+        && (p.weight is int || p.weight is float) && p.weight>0 && p.weight<=25000
+        && (p.diameter is int || p.diameter is float) && p.diameter>0 && p.diameter<=10
+        && p.storage is int && p.storage>=0 && p.storage<=100000 && p.updatedAt == request.time
+        && identity(p) == id && alias(uid,p.barcode,id) && alias(uid,p.sku,id)
+        && p.lastRequestId is string && p.lastRequestId.matches('^[A-Za-z0-9-]{20,100}$');
+    }
+    function newEvent(uid,id,p) {
+      let eventPath=/databases/$(database)/documents/users/$(uid)/events/$(p.lastRequestId);
+      let event=getAfter(eventPath).data;
+      return !exists(eventPath) && event.productId==id && event.balance==p.storage && event.timestamp==request.time;
+    }
+    function eventValid(uid,id,e) {
+      let productPath=/databases/$(database)/documents/users/$(uid)/products/$(e.productId);
+      let p=getAfter(productPath).data;
+      let existed=exists(productPath);
+      let before=existed?get(productPath).data.storage:0;
+      return id.matches('^[A-Za-z0-9-]{20,100}$')
+        && e.keys().hasOnly(['productId','material','colour','brand','mode','delta','balance','source','hash','timestamp'])
+        && e.productId is string && e.hash is string && e.hash.matches('^[a-f0-9]{64}$')
+        && e.timestamp==request.time && p.lastRequestId==id && e.balance==p.storage && e.balance==before+e.delta
+        && e.material==p.material && e.colour==p.colour && e.brand==p.brand
+        && ((e.mode=='ADD' && e.delta==1 && e.source in ['Barcode','Label','Manual'])
+          || (e.mode=='USE' && e.delta==-1 && existed && before>0 && e.source in ['Barcode','Label','Manual'])
+          || (e.mode=='OPENING' && !existed && e.delta is int && e.delta>=0 && e.delta<=100000 && e.source=='Migration'
+            && get(/databases/$(database)/documents/owners/$(uid)).data.importOpen==true));
+    }
+    match /owners/{uid} {
+      allow get: if request.auth != null && request.auth.uid==uid;
+      allow list,write: if false;
+    }
+    match /users/{uid}/products/{id} {
+      allow read: if owner(uid);
+      allow create: if owner(uid) && productValid(uid,id,request.resource.data) && newEvent(uid,id,request.resource.data);
+      allow update: if owner(uid) && productValid(uid,id,request.resource.data) && newEvent(uid,id,request.resource.data)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['storage','barcode','sku','filamentCode','location','updatedAt','lastRequestId'])
+        && (resource.data.barcode=='' || resource.data.barcode==request.resource.data.barcode)
+        && (resource.data.sku=='' || resource.data.sku==request.resource.data.sku)
+        && (resource.data.filamentCode=='' || resource.data.filamentCode==request.resource.data.filamentCode);
+      allow delete: if false;
+    }
+    match /users/{uid}/events/{id} {
+      allow read: if owner(uid);
+      allow create: if owner(uid) && eventValid(uid,id,request.resource.data);
+      allow update,delete: if false;
+    }
+    match /users/{uid}/codes/{id} {
+      allow read: if owner(uid);
+      allow create: if owner(uid) && request.resource.data.keys().hasOnly(['value','productId'])
+        && text(request.resource.data.value,120) && id==digest(canonical(request.resource.data.value))
+        && (canonical(getAfter(/databases/$(database)/documents/users/$(uid)/products/$(request.resource.data.productId)).data.barcode)==request.resource.data.value
+          || canonical(getAfter(/databases/$(database)/documents/users/$(uid)/products/$(request.resource.data.productId)).data.sku)==request.resource.data.value);
+      allow update: if owner(uid) && request.resource.data==resource.data;
+      allow delete: if false;
+    }
+    match /users/{uid}/meta/{id} {
+      allow read: if owner(uid);
+      allow write: if false;
+    }
+  }
+}
