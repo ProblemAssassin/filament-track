@@ -6,15 +6,12 @@ var TRACKER = {
   headers: ['Request ID','Timestamp','Action','Product ID','Material','Colour','Brand','Weight (g)','Diameter (mm)','Barcode','SKU','Filament Code','Location','Notes','Source','Delta','Balance','Variant','Request hash']
 };
 
-function doGet(e) {
+function doGet() {
   var template = HtmlService.createTemplateFromFile('Index');
-  var channel = String(e && e.parameter && e.parameter.channel || '');
-  template.channel = /^[a-zA-Z0-9-]{16,100}$/.test(channel) ? channel : '';
-  var origin = String(e && e.parameter && e.parameter.origin || TRACKER.appOrigin);
-  template.appOrigin = [TRACKER.appOrigin,'http://127.0.0.1:4173'].indexOf(origin)>=0 ? origin : TRACKER.appOrigin;
+  template.appOrigin = TRACKER.appOrigin;
   template.appUrl = TRACKER.appUrl;
+  template.connectionUrl = ScriptApp.getService().getUrl();
   return template.evaluate().setTitle('FilamentTrack · Google connection')
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
     .addMetaTag('viewport','width=device-width, initial-scale=1');
 }
 
