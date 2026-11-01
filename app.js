@@ -129,8 +129,8 @@ function updateSaveButtons(){
   $('close-scan').disabled=state.saving;$('retake-button').disabled=state.saving;$('edit-button').disabled=state.saving;
 }
 function savePending(request){localStorage.setItem(pendingKey,JSON.stringify(request));pending=request;}
-function clearPending(){localStorage.removeItem(pendingKey);pending=null;$('pending-notice').hidden=true;}
-function showPending(){$('pending-notice').hidden=!pending;if(pending)$('pending-text').textContent=(pending.mode==='ADD'?'Add':'Use')+' 1 '+(pending.product?.material||'filament')+' · '+(pending.product?.colour||'')+'. Check whether Google recorded it before continuing.';updateSaveButtons();}
+function clearPending(){localStorage.removeItem(pendingKey);pending=null;$('pending-notice').hidden=true;$('check-save').hidden=true;$('check-save').textContent='Check save';$('resolve-pending').textContent='Check save';$('resolve-pending').onclick=resolvePending;}
+function showPending(){$('pending-notice').hidden=!pending;$('check-save').hidden=!pending;if(pending)$('pending-text').textContent=(pending.mode==='ADD'?'Add':'Use')+' 1 '+(pending.product?.material||'filament')+' · '+(pending.product?.colour||'')+'. Check whether Google recorded it before continuing.';updateSaveButtons();}
 async function saveRoll(again){
   if(state.saving||pending)return;
   const product=readFields(),error=validateDraft(product,state.mode);
@@ -154,23 +154,24 @@ async function saveRoll(again){
   finally{state.saving=false;$('ok-button').textContent='OK · '+(state.mode==='ADD'?'add':'use')+' 1 & finish';updateSaveButtons();}
 }
 async function resolvePending(){
-  if(!pending)return;$('resolve-pending').disabled=true;
+  if(!pending)return;$('resolve-pending').disabled=true;$('check-save').disabled=true;
   try{
     let receipt=await bridge.call({method:'receipt',requestId:pending.requestId});
     if(receipt.found){clearPending();applyState(receipt.state);state.session++;toast('The previous roll was saved once. Inventory refreshed.');if($('scan-dialog').open)$('scan-dialog').close();$('resolve-pending').onclick=resolvePending;$('resolve-pending').textContent='Check save';}
     else{
       applyState(receipt.state);$('pending-text').textContent='Google has no receipt for this roll. Retry uses the same transaction ID, so it cannot count twice.';
+      $('save-error').textContent='Google has no receipt yet. Retry uses the same transaction ID and cannot count twice.';$('save-error').hidden=false;$('check-save').textContent='Retry this save';
       $('resolve-pending').textContent='Retry this save';$('resolve-pending').onclick=async()=>{
-        $('resolve-pending').disabled=true;
+        $('resolve-pending').disabled=true;$('check-save').disabled=true;
         try{const r=await bridge.call(pending);clearPending();applyState(r.state);toast('Saved once. Inventory refreshed.');if($('scan-dialog').open)$('scan-dialog').close();$('resolve-pending').onclick=resolvePending;$('resolve-pending').textContent='Check save';}
         catch(e){
           if(e.serverRejected){try{const receipt=await bridge.call({method:'receipt',requestId:pending.requestId});if(!receipt.found){clearPending();applyState(receipt.state);toast(e.message+' Nothing was saved.');if($('scan-dialog').open)$('scan-dialog').close();return;}}catch{}}
           $('pending-text').textContent=e.message+' The pending transaction is retained.';
         }
-        finally{$('resolve-pending').disabled=false;}
+        finally{$('resolve-pending').disabled=false;$('check-save').disabled=false;}
       };
     }
-  }catch(e){$('pending-text').textContent=e.message;}finally{$('resolve-pending').disabled=false;}
+  }catch(e){$('pending-text').textContent=e.message;$('save-error').textContent=e.message;$('save-error').hidden=false;}finally{$('resolve-pending').disabled=false;$('check-save').disabled=false;}
 }
 $('add-button').addEventListener('click',()=>openSession('ADD'));$('use-button').addEventListener('click',()=>openSession('USE'));
 $('close-scan').addEventListener('click',()=>$('scan-dialog').close());
@@ -204,6 +205,7 @@ $('connection-url').value=getScriptUrl();$('google-connect-link').href=getScript
 $('google-connect-link').addEventListener('click',event=>{try{$('google-connect-link').href=saveScriptUrl($('connection-url').value);}catch(e){event.preventDefault();$('connection-detail').textContent=e.message;}});
 $('reconnect-button').addEventListener('click',()=>{try{const url=saveScriptUrl($('connection-url').value);$('google-connect-link').href=url;bridge.connect();$('connection-dialog').close();}catch(e){$('connection-detail').textContent=e.message;}});
 $('resolve-pending').onclick=resolvePending;
+$('check-save').addEventListener('click',()=>$('resolve-pending').click());
 $('export-button').addEventListener('click',()=>{
   if(!state.loaded){toast('Load your inventory before exporting.');return;}
   const headers=['Material','Colour','In Storage','Brand','Weight (g)','Diameter (mm)','Barcode','SKU','Filament Code','Variant','Location'];
