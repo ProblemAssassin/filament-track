@@ -36,6 +36,14 @@ Google documents that Apps Script can fail with multiple signed-in accounts. The
 
 **Tracker Journal is authoritative.** Each event stores a product snapshot, a fixed +1 or −1 delta, the resulting balance, and a unique request ID. Locking prevents overlapping stock mutations; replaying the same request cannot append a second event. **Tracker Inventory** is the readable materialised view. Do not manually edit the journal or its generated balances. Original tabs remain as a preserved migration baseline.
 
+## Saving and recovery
+
+Normal confirmation makes one save request and waits for its matching receipt. If the response is delayed, **Finish / check save** sends the original transaction ID in one call: the server returns the existing receipt or completes that same operation. It cannot count the roll twice. A late confirmation received within five minutes of a timeout is accepted automatically while this app remains open. Pending requests remain in browser storage if the page closes or the response arrives later.
+
+After six seconds, the app shows whether the Google tab acknowledged the request (updated Google launcher required). **Go to Google connection** attempts to focus the existing Google tab; switch to it manually if your phone blocks this. Mobile browsers can pause background tabs. The app continues to require a server receipt before displaying a roll as saved.
+
+The optimised Apps Script source reconciles the journal once under its lock, applies the confirmed append in memory, and updates inventory values in one batch. Header formatting, column sizes and filter setup run during setup or when needed for new products. **This backend optimisation requires deploying the updated Apps Script files; the live private backend is still version 10 until that deployment is completed.**
+
 ## New barcode → material label
 
 1. Tap **Add Filament** or **Use Filament** and scan a box barcode.
