@@ -14,7 +14,7 @@ Date: 1 November 2026 (Singapore time).
 
 | Check | Evidence / result |
 | --- | --- |
-| Automated tests | 34 passing tests across core, backend, connection, account-routing and scan-flow suites. |
+| Automated tests | 42 passing tests across core, backend, connection, account-routing and scan-flow suites. |
 | Opening-stock migration | Setup imports the existing records once. Original inventory and transaction tabs remain intact. |
 | Duplicate submission / retry | Replaying a request ID produces one committed event. Reusing it with different content is rejected. |
 | Stock protection | The last roll reaches zero; another Use is rejected. Unknown products cannot be deducted. |
@@ -77,3 +77,13 @@ Four additional automated checks cover copied-link normalization, the chooser’
 An unfamiliar barcode with incomplete product details now shows a dedicated Scan material label prompt. The original barcode stays attached through live label reading, photo upload and label retakes. The label step bypasses barcode decoding so the same symbol cannot intercept it. Detected fields from the two sides are merged; defaults are applied only for review, not as constraints when matching saved products. Confirmation stores the barcode mapping and the single Add/Use operation together using the existing backend API. Known barcodes proceed directly to verification. Unknown Use products remain blocked. Conflicting saved aliases are surfaced instead of discarded or overwritten.
 
 Eight scan-flow tests exercise the actual app handlers with a lightweight DOM and simulated scanner/bridge callbacks, including new/known codes, label photos, retakes, manual fallback, Use, alias conflicts, package-size mismatches and save/continue. They also exercise the actual scanner’s live-loop and Read label branches with controlled frames/OCR to verify barcode bypass. An additional test exercises the actual backend source against mocked Google services to verify atomic tagging, one-roll accounting and retry idempotency. All 34 automated tests pass. No live inventory was changed for this update. Physical camera behaviour and visual layout of the new prompt still require browser/device verification; local browser control was unavailable. The private backend deployment remains version 10.
+
+## Save-performance update — frontend released, backend deployment pending
+
+The frontend recovery button now sends the original transaction directly, replacing receipt lookup followed by a separate retry. The existing idempotent backend either returns its saved receipt or commits that same request once. Slow requests display progress after six seconds. Updated launcher source acknowledges receipt immediately so the frontend can distinguish delivery from Google processing. Timed-out mutations retain their message listener for five minutes and can complete automatically on a late valid confirmation. Pending local storage remains the fallback after closure or expiry. Stock is never optimistically marked as saved.
+
+Prepared Apps Script changes remove the second full-journal read after a flushed append, update the reconciled state in memory under the same lock, and skip repeated inventory formatting, column resizing and filter work on ordinary saves. Inventory values remain a single batch write. Setup still configures the view; growth still extends capacity and filters.
+
+Eight additional automated tests cover one journal read and one inventory data write with no layout operations, returned-state equivalence to a fresh journal read, mirror failure, flush failure/replay, progress acknowledgements, late replies, listener expiry, one-call recovery and automatic late completion. All 42 tests pass. These checks use the actual source with mocked Google services or controlled browser adapters. No wall-clock speedup is claimed from mock timings.
+
+The frontend files and prepared backend source are published in the repository. The live Google backend remains version 10: browser control continued to report disabled despite the user enabling access, and the fallback editor connection timed out. Therefore the backend optimisation and launcher acknowledgement are not yet live. The frontend works with version 10. No live Sheet writes or signed-in performance measurements were performed for this update. Google cold starts, network latency and phone background-tab suspension remain possible delays.
