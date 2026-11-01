@@ -7,6 +7,13 @@ export function findByCode(products, code) {
   if (!n) return null;
   return products.find(p => [p.barcode,p.sku,p.id].some(v => normal(v) === n)) || null;
 }
+export function mergeScanDetails(previous, detected, barcode='') {
+  const merged={...previous};
+  for(const [field,value] of Object.entries(detected))if(value!==''&&value!==undefined&&field!=='raw')merged[field]=value;
+  // The material label can contain a different printed number. Keep the box barcode being tagged.
+  merged.barcode=barcode||detected.barcode||previous.barcode||'';
+  return merged;
+}
 export function parseLabel(text) {
   const raw = clean(text);
   const upper = raw.toUpperCase();
@@ -33,7 +40,7 @@ export function labelMatches(products, draft) {
     if (exact) return [exact];
   }
   if (draft.filamentCode && draft.brand) {
-    const byCode=products.filter(p=>normal(p.brand)===normal(draft.brand)&&normal(p.filamentCode)===normal(draft.filamentCode)&&(!draft.variant||normal(p.variant)===normal(draft.variant)));
+    const byCode=products.filter(p=>normal(p.brand)===normal(draft.brand)&&normal(p.filamentCode)===normal(draft.filamentCode)&&['material','colour','variant'].every(f=>!draft[f]||normal(p[f])===normal(draft[f]))&&['weight','diameter'].every(f=>!draft[f]||Number(p[f])===Number(draft[f])));
     if (byCode.length) return byCode;
   }
   if (!draft.material || !draft.colour) return [];
