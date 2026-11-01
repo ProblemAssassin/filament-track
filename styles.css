@@ -4,3 +4,4 @@
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
 .camera-view>img{position:absolute;inset:0;background:#080f1a}
 .tag-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.tag-actions .button{white-space:normal}.label-link-code{overflow-wrap:anywhere;font-family:ui-monospace,monospace}.detection-meta span{overflow-wrap:anywhere;min-width:0}
+.save-progress{font-size:12px;color:var(--muted);margin-bottom:10px}.save-progress p{margin:0 0 6px}
