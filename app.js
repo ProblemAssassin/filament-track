@@ -9,7 +9,7 @@ try{pending=JSON.parse(localStorage.getItem(pendingKey)||'null');}catch{}
 const fields=['material','colour','brand','weight','diameter','variant','barcode','sku','filamentCode','location'];
 const colours={red:'#e95758',black:'#24292e',white:'#e7e8e3',grey:'#91989d',gray:'#91989d',blue:'#4d8ed4',green:'#53ae84',yellow:'#e3c94f',orange:'#e6a05d',purple:'#a189d5',pink:'#d98fb5',brown:'#9a7054',silver:'#a5b6c1',gold:'#c4a15d'};
 const scanner=new LabelScanner($('camera-video'),received,setProgress,cameraState);
-const bridge=new GoogleBridge(connectionStatus);
+const bridge=new GoogleBridge(connectionStatus,lateSaveResult);
 function node(tag,text,className){const el=document.createElement(tag);if(text!==undefined)el.textContent=text;if(className)el.className=className;return el;}
 function setProgress(text){$('scan-progress').textContent=text;}
 function toast(message){clearTimeout(toastTimer);$('toast').textContent=message;$('toast').hidden=false;toastTimer=setTimeout(()=>$('toast').hidden=true,4500);}
@@ -163,49 +163,57 @@ function updateSaveButtons(){
   $('scan-material-label').disabled=state.saving;$('tag-manually').disabled=state.saving;
 }
 function savePending(request){localStorage.setItem(pendingKey,JSON.stringify(request));pending=request;}
-function clearPending(){localStorage.removeItem(pendingKey);pending=null;$('pending-notice').hidden=true;$('check-save').hidden=true;$('check-save').textContent='Check save';$('resolve-pending').textContent='Check save';$('resolve-pending').onclick=resolvePending;}
-function showPending(){$('pending-notice').hidden=!pending;$('check-save').hidden=!pending;if(pending)$('pending-text').textContent=(pending.mode==='ADD'?'Add':'Use')+' 1 '+(pending.product?.material||'filament')+' · '+(pending.product?.colour||'')+'. Check whether Google recorded it before continuing.';updateSaveButtons();}
+function clearPending(){localStorage.removeItem(pendingKey);pending=null;$('pending-notice').hidden=true;$('check-save').hidden=true;$('save-progress').hidden=true;$('check-save').textContent='Finish / check save';$('resolve-pending').textContent='Finish / check save';}
+function showPending(){$('pending-notice').hidden=!pending;$('check-save').hidden=!pending;if(pending)$('pending-text').textContent=(pending.mode==='ADD'?'Add':'Use')+' 1 '+(pending.product?.material||'filament')+' · '+(pending.product?.colour||'')+'. Finish / check uses the same transaction: it confirms an existing save or retries it once, without counting twice.';updateSaveButtons();}
+function saveProgress(info){
+  if(!pending)return;
+  $('save-progress').hidden=false;$('wake-google').hidden=info.stage!=='slow';
+  $('save-progress-text').textContent=info.stage==='slow'?(info.accepted?'Google is still processing this roll. You can switch to the Google connection tab briefly if it stays paused.':'Waiting for the Google connection tab. Your phone may have paused it in the background. Switch to that tab briefly, then return here.'):info.stage==='accepted'?'Google received this roll. Saving…':'Sending this roll to Google…';
+}
+async function finishSave(request,result,again){
+  if(pending?.requestId!==request.requestId)return;
+  if(result.event?.requestId!==request.requestId)throw new Error('Google did not return the matching transaction receipt.');
+  applyState(result.state);clearPending();state.session++;$('session-count').textContent=state.session+' '+(request.mode==='ADD'?'added':'used');
+  toast(result.warning||((request.mode==='ADD'?'Added':'Used')+' 1 '+request.product.material+' · '+request.product.colour+'. Saved to Google Sheet.'));
+  if(again&&$('scan-dialog').open){populateExisting();resetDraft();setManual(false);if(scanner.running)scanner.resume();else await startCamera();}else $('scan-dialog').close();
+}
+async function lateSaveResult(request,result){
+  if(pending?.requestId!==request.requestId)return;
+  try{await finishSave(request,result,state.saveAgain);}catch(e){$('pending-text').textContent=e.message;}
+}
 async function saveRoll(again){
   if(state.saving||pending)return;
   const product=readFields(),error=validateDraft(product,state.mode)||aliasConflict(product);
   if(error){$('save-error').textContent=error;$('save-error').hidden=false;return;}
   const request={method:'mutate',requestId:crypto.randomUUID(),mode:state.mode,product,source:state.source};
-  state.saving=true;scanner.hold();$('save-error').hidden=true;
+  state.saving=true;state.saveAgain=again;scanner.hold();$('save-error').hidden=true;
   try{savePending(request);}catch{state.saving=false;$('save-error').textContent='Browser storage is unavailable. Enable site storage before saving, so a network interruption cannot cause duplicate rolls.';$('save-error').hidden=false;updateSaveButtons();return;}
-  updateSaveButtons();$('ok-button').textContent='Saving to Google…';
+  updateSaveButtons();$('ok-button').textContent='Saving to Google…';saveProgress({stage:'sending'});
   try{
-    const result=await bridge.call(request);if(!result.event)throw new Error('Google did not return a transaction receipt.');
-    clearPending();applyState(result.state);state.session++;$('session-count').textContent=state.session+' '+(state.mode==='ADD'?'added':'used');
-    toast(result.warning||((state.mode==='ADD'?'Added':'Used')+' 1 '+product.material+' · '+product.colour+'. Saved to Google Sheet.'));
-    if(again){populateExisting();resetDraft();setManual(false);if(scanner.running)scanner.resume();else await startCamera();}else{$('scan-dialog').close();}
+    const result=await bridge.call(request,info=>{if(pending?.requestId===request.requestId)saveProgress(info);});
+    await finishSave(request,result,again);
   }catch(e){
     // An explicit server rejection is checked against the journal before clearing the pending request.
     if(e.serverRejected){
       try{const receipt=await bridge.call({method:'receipt',requestId:request.requestId});if(!receipt.found){clearPending();applyState(receipt.state);$('save-error').textContent=e.message;$('save-error').hidden=false;return;}}catch{}
     }
-    $('save-error').textContent=e.message+' Tap “Check save” before continuing.';$('save-error').hidden=false;showPending();
+    $('save-error').textContent=e.message+' Tap “Finish / check save” to confirm or retry this same roll.';$('save-error').hidden=false;showPending();
   }
   finally{state.saving=false;$('ok-button').textContent='OK · '+(state.mode==='ADD'?'add':'use')+' 1 & finish';updateSaveButtons();}
 }
 async function resolvePending(){
-  if(!pending)return;$('resolve-pending').disabled=true;$('check-save').disabled=true;
+  if(!pending||state.saving)return;
+  const request=pending;state.saving=true;$('resolve-pending').disabled=true;$('check-save').disabled=true;updateSaveButtons();saveProgress({stage:'sending'});
   try{
-    let receipt=await bridge.call({method:'receipt',requestId:pending.requestId});
-    if(receipt.found){clearPending();applyState(receipt.state);state.session++;toast('The previous roll was saved once. Inventory refreshed.');if($('scan-dialog').open)$('scan-dialog').close();$('resolve-pending').onclick=resolvePending;$('resolve-pending').textContent='Check save';}
-    else{
-      applyState(receipt.state);$('pending-text').textContent='Google has no receipt for this roll. Retry uses the same transaction ID, so it cannot count twice.';
-      $('save-error').textContent='Google has no receipt yet. Retry uses the same transaction ID and cannot count twice.';$('save-error').hidden=false;$('check-save').textContent='Retry this save';
-      $('resolve-pending').textContent='Retry this save';$('resolve-pending').onclick=async()=>{
-        $('resolve-pending').disabled=true;$('check-save').disabled=true;
-        try{const r=await bridge.call(pending);clearPending();applyState(r.state);toast('Saved once. Inventory refreshed.');if($('scan-dialog').open)$('scan-dialog').close();$('resolve-pending').onclick=resolvePending;$('resolve-pending').textContent='Check save';}
-        catch(e){
-          if(e.serverRejected){try{const receipt=await bridge.call({method:'receipt',requestId:pending.requestId});if(!receipt.found){clearPending();applyState(receipt.state);toast(e.message+' Nothing was saved.');if($('scan-dialog').open)$('scan-dialog').close();return;}}catch{}}
-          $('pending-text').textContent=e.message+' The pending transaction is retained.';
-        }
-        finally{$('resolve-pending').disabled=false;$('check-save').disabled=false;}
-      };
-    }
-  }catch(e){$('pending-text').textContent=e.message;$('save-error').textContent=e.message;$('save-error').hidden=false;}finally{$('resolve-pending').disabled=false;$('check-save').disabled=false;}
+    // The server checks this request ID under its lock: return its receipt if saved,
+    // otherwise commit this same operation. One call replaces check-then-retry.
+    const result=await bridge.call(request,info=>{if(pending?.requestId===request.requestId)saveProgress(info);});
+    await finishSave(request,result,state.saveAgain);
+  }catch(e){
+    if(pending?.requestId!==request.requestId)return;
+    if(e.serverRejected){try{const receipt=await bridge.call({method:'receipt',requestId:request.requestId});if(!receipt.found){clearPending();applyState(receipt.state);toast(e.message+' Nothing was saved.');return;}}catch{}}
+    $('pending-text').textContent=e.message+' The pending transaction is retained.';$('save-error').textContent=e.message;$('save-error').hidden=false;
+  }finally{state.saving=false;$('resolve-pending').disabled=false;$('check-save').disabled=false;updateSaveButtons();}
 }
 document.querySelector('.brand').addEventListener('click',event=>{event.preventDefault();window.scrollTo(0,0);});
 $('add-button').addEventListener('click',()=>openSession('ADD'));$('use-button').addEventListener('click',()=>openSession('USE'));
@@ -242,7 +250,8 @@ $('history-button').addEventListener('click',()=>$('history-dialog').showModal()
 $('connection-button').addEventListener('click',()=>$('connection-dialog').showModal());$('close-connection').addEventListener('click',()=>$('connection-dialog').close());
 $('connection-url').value=getScriptUrl();
 $('google-connect-link').addEventListener('click',()=>{try{const url=saveScriptUrl($('connection-url').value);window.location.assign(googleAccountChooserUrl(url));}catch(e){$('connection-detail').textContent=e.message;$('connection-url').focus();}});
-$('resolve-pending').onclick=resolvePending;
+$('resolve-pending').addEventListener('click',resolvePending);
+$('wake-google').addEventListener('click',()=>{bridge.wake?.();$('save-progress-text').textContent='Switch to the existing Google connection tab briefly, then return here. This roll stays pending until Google confirms it.';});
 $('check-save').addEventListener('click',()=>$('resolve-pending').click());
 $('export-button').addEventListener('click',()=>{
   if(!state.loaded){toast('Load your inventory before exporting.');return;}
