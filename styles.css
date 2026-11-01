@@ -3,3 +3,4 @@
 @media(max-width:370px){.shell{padding-inline:13px}.action{padding:16px 11px;gap:8px}.action strong{font-size:16px}.action-icon{width:31px;height:37px}.stats>div{padding-left:9px}td,th{padding-inline:10px}.colour-name{gap:5px}.save-actions{grid-template-columns:1fr}.save-actions .button{min-height:42px}.field-grid{gap:9px}}
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
 .camera-view>img{position:absolute;inset:0;background:#080f1a}
+.tag-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.tag-actions .button{white-space:normal}.label-link-code{overflow-wrap:anywhere;font-family:ui-monospace,monospace}.detection-meta span{overflow-wrap:anywhere;min-width:0}
