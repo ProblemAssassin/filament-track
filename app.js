@@ -1,10 +1,11 @@
 import {GoogleBridge} from './bridge.js';
-import {LabelScanner} from './scanner.js';
+import {LabelScanner} from './scanner.js?v=20261101-scan3';
 import {clean,normal,findByCode,labelMatches,mergeScanDetails,parseLabel,validateDraft,csvCell} from './core.js';
 import {getScriptUrl,saveScriptUrl,googleAccountChooserUrl} from './config.js';
 const $=id=>document.getElementById(id);
 const state={products:[],events:[],connected:false,loaded:false,mode:'ADD',draft:null,source:'Manual',saving:false,session:0,selectedId:'',raw:'',lastBarcode:'',saveResolved:false,scanDetails:{},readingLabel:false};
 const pendingKey='filament-track-pending-v1';let pending=null;let toastTimer;
+let cameraRequest=0;
 try{pending=JSON.parse(localStorage.getItem(pendingKey)||'null');}catch{}
 const fields=['material','colour','brand','weight','diameter','variant','barcode','sku','filamentCode','location'];
 const colours={red:'#e95758',black:'#24292e',white:'#e7e8e3',grey:'#91989d',gray:'#91989d',blue:'#4d8ed4',green:'#53ae84',yellow:'#e3c94f',orange:'#e6a05d',purple:'#a189d5',pink:'#d98fb5',brown:'#9a7054',silver:'#a5b6c1',gold:'#c4a15d'};
@@ -81,7 +82,7 @@ async function openSession(mode,product){
 }
 function resetDraft(){
   state.draft=null;state.selectedId='';state.source='Manual';state.raw='';state.lastBarcode='';state.saving=false;state.saveResolved=false;
-  state.scanDetails={};state.readingLabel=false;scanner.labelOnly=false;$('label-link-prompt').hidden=true;$('capture-button').textContent='Read label';
+  state.scanDetails={};state.readingLabel=false;scanner.labelOnly=false;scanner.autoOcr=false;$('label-link-prompt').hidden=true;$('capture-button').textContent='Read label';
   fillFields(blankDraft());lockIdentity(false);$('existing-product').value='';$('product-form').hidden=true;$('detected-product').hidden=true;$('detection-placeholder').hidden=false;$('edit-button').hidden=true;$('detection-status').textContent='READY TO SCAN';$('detection-status').className='badge';$('draft-alert').hidden=true;$('save-error').hidden=true;$('ocr-details').hidden=true;$('capture-preview').hidden=true;$('camera-guide').hidden=false;$('camera-idle').hidden=!!scanner.running;$('camera-paused').hidden=true;$('retake-button').hidden=true;updateSaveButtons();
 }
 function chooseProduct(product,aliases={}){
@@ -104,15 +105,16 @@ function aliasConflict(product){
 }
 function prepareLabelScan(){
   if(state.saving||!state.lastBarcode)return false;
-  state.readingLabel=true;scanner.labelOnly=true;scanner.autoOcr=true;
+  state.readingLabel=true;scanner.labelOnly=true;scanner.autoOcr=false;
   $('label-link-prompt').hidden=true;$('capture-preview').hidden=true;$('camera-paused').hidden=true;$('camera-guide').hidden=false;$('retake-button').hidden=true;$('product-form').hidden=true;
   $('detection-status').textContent='SCAN MATERIAL LABEL';$('capture-button').textContent='Read material label';
   setProgress('Barcode kept. Show the material label on the same box, or take/upload its photo. Nothing has been saved.');return true;
 }
 async function scanMaterialLabel(){
   if(!prepareLabelScan())return;
-  setManual(false);if(scanner.running)scanner.resume();else await startCamera();
-  if(scanner.running)setProgress('Barcode kept. Point at the material label on the same box. We’ll fill the details above for you to verify.');
+  ++cameraRequest;state.cameraStarting=false;scanner.stop();
+  setProgress('Barcode kept. Take a clear photo of the material label on this box. Check the details above before saving.');
+  $('photo-input').click();
 }
 function received({code='',text='',source,image}){
   if(!$('scan-dialog').open||state.saving)return;
@@ -136,7 +138,7 @@ function received({code='',text='',source,image}){
   const needsLabel=!!parsed.barcode&&!exact&&matches.length!==1&&(!parsed.material||!parsed.colour||!parsed.brand);
   if(needsLabel){
     $('label-link-prompt').hidden=false;$('label-link-code').textContent=parsed.barcode;
-    $('scan-material-label').textContent=state.readingLabel?'Read material label again':'Scan material label';
+    $('scan-material-label').textContent=state.readingLabel?'Take label photo again':'Take label photo';
     $('detection-status').textContent='NEW BARCODE · LABEL NEEDED';
     if(!state.readingLabel)$('product-form').hidden=true;
   }
@@ -144,13 +146,15 @@ function received({code='',text='',source,image}){
 }
 function setManual(manual){
   $('manual-tab').classList.toggle('active',manual);$('manual-tab').setAttribute('aria-pressed',String(manual));$('camera-tab').classList.toggle('active',!manual);$('camera-tab').setAttribute('aria-pressed',String(!manual));
-  if(manual){scanner.hold();$('label-link-prompt').hidden=true;$('product-form').hidden=false;if(!state.draft){state.draft=blankDraft();fillFields(state.draft);}setProgress('Choose an existing filament or enter details. Each confirmation counts one roll.');updateSaveButtons();}
+  if(manual){++cameraRequest;state.cameraStarting=false;scanner.stop();$('label-link-prompt').hidden=true;$('product-form').hidden=false;if(!state.draft){state.draft=blankDraft();fillFields(state.draft);}setProgress('Choose an existing filament or enter details. Each confirmation counts one roll.');updateSaveButtons();}
 }
-function cameraState(active){$('camera-idle').hidden=active;$('capture-button').disabled=!active;$('start-camera').disabled=false;}
+function cameraState(active){$('camera-idle').hidden=active;$('capture-button').disabled=!active||state.readingPhoto;$('start-camera').disabled=!!state.cameraStarting||!!state.readingPhoto;if(!active&&!state.cameraStarting)$('camera-idle-text').textContent=state.readingPhoto?'Photo selected. Camera is off.':'Camera is off. Start it to scan a barcode, or take/upload a photo.';}
 async function startCamera(){
-  if(!state.connected)return;
+  if(!state.connected||state.cameraStarting||state.readingPhoto)return;
+  const request=++cameraRequest;state.cameraStarting=true;
   $('start-camera').disabled=true;$('camera-idle-text').textContent='Starting camera…';setManual(false);
-  try{await scanner.start();}catch(e){$('camera-idle-text').textContent=e.message;$('start-camera').textContent='Try camera again';$('start-camera').disabled=false;setProgress('Take/upload a photo or enter details manually.');}
+  try{await scanner.start();}catch(e){if(request!==cameraRequest||state.readingPhoto||!$('scan-dialog').open)return;$('camera-idle-text').textContent=e.message;$('start-camera').textContent='Try camera again';setProgress('Take/upload a photo or enter details manually.');}
+  finally{if(request===cameraRequest){state.cameraStarting=false;$('start-camera').disabled=!!state.readingPhoto;}}
 }
 function updateSaveButtons(){
   if(!$('ok-button'))return;
@@ -219,7 +223,7 @@ document.querySelector('.brand').addEventListener('click',event=>{event.preventD
 $('add-button').addEventListener('click',()=>openSession('ADD'));$('use-button').addEventListener('click',()=>openSession('USE'));
 $('close-scan').addEventListener('click',()=>$('scan-dialog').close());
 $('scan-dialog').addEventListener('cancel',e=>{if(state.saving)e.preventDefault();});
-$('scan-dialog').addEventListener('close',()=>{scanner.stop();if(pending)showPending();});
+$('scan-dialog').addEventListener('close',()=>{++cameraRequest;state.cameraStarting=false;scanner.stop();if(pending)showPending();});
 $('camera-tab').addEventListener('click',async()=>{setManual(false);if(!scanner.running)await startCamera();else if(!state.draft)scanner.resume();});
 $('manual-tab').addEventListener('click',()=>{setManual(true);$('existing-product').focus();});
 $('start-camera').addEventListener('click',startCamera);
@@ -227,12 +231,14 @@ $('capture-button').addEventListener('click',async()=>{try{await scanner.capture
 $('scan-material-label').addEventListener('click',scanMaterialLabel);
 $('tag-manually').addEventListener('click',()=>{setManual(true);$('field-material').focus();});
 $('retake-button').addEventListener('click',async()=>{if(state.readingLabel){await scanMaterialLabel();return;}resetDraft();setManual(false);if(scanner.running)scanner.resume();else await startCamera();});
+$('photo-input').addEventListener('click',()=>{++cameraRequest;state.cameraStarting=false;scanner.stop();$('camera-idle-text').textContent='Camera is off while you take or choose a photo.';});
 $('photo-input').addEventListener('change',async e=>{
   const file=e.target.files?.[0];e.target.value='';if(!file||state.saving)return;
   if(state.lastBarcode&&!findByCode(state.products,state.lastBarcode))prepareLabelScan();
   else{resetDraft();}
+  ++cameraRequest;state.cameraStarting=false;state.readingPhoto=true;$('start-camera').disabled=true;
   setProgress('Reading photo on your device…');$('photo-input').disabled=true;$('capture-button').disabled=true;
-  try{await scanner.photo(file);}catch(error){setProgress(error.message);}finally{$('photo-input').disabled=false;$('capture-button').disabled=!scanner.running;}
+  try{await scanner.photo(file);}catch(error){setProgress(error.message);}finally{state.readingPhoto=false;$('photo-input').disabled=false;$('start-camera').disabled=false;$('capture-button').disabled=!scanner.running;}
 });
 $('edit-button').addEventListener('click',()=>{$('product-form').hidden=!$('product-form').hidden;});
 $('existing-product').addEventListener('change',e=>{

@@ -89,6 +89,8 @@ function trackerApi(request) {
       if(previous.hash!==hash) throw new Error('This request ID was already used for a different action.');
       return {ok:true,replayed:true,event:previous,state:response_(ss,state)};
     }
+    if(PropertiesService.getScriptProperties().getProperty('TRACKER_PRIMARY_BACKEND')==='FIREBASE')
+      throw new Error('Inventory has moved to Firebase. Open https://problemassassin.github.io/filament-track/ to continue. No new roll was saved here.');
     var proposed=validatedProduct_(request.product);
     var existing=proposed.id?state.products.filter(function(p){return p.id===proposed.id;})[0]:null;
     if(proposed.id&&!existing) throw new Error('This product no longer exists. Refresh and select it again.');

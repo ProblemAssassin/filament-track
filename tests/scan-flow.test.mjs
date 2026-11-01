@@ -6,7 +6,7 @@ import crypto from 'node:crypto';
 import * as core from '../core.js';
 import {LabelScanner} from '../scanner.js';
 
-const source=fs.readFileSync(new URL('../app.js',import.meta.url),'utf8').replace(/^import[^\n]*\n/gm,'')+'\nthis.flow={state,scanner,bridge,resetDraft,received,scanMaterialLabel,saveRoll,lateSaveResult};';
+const source=fs.readFileSync(new URL('../app.js',import.meta.url),'utf8').replace(/^import[^\n]*\n/gm,'')+'\nthis.flow={state,scanner,bridge,resetDraft,received,scanMaterialLabel,saveRoll,lateSaveResult,startCamera};';
 const barcode='6975337030270';
 const label='Bambu Lab PLA Basic Red Filament Code 10200';
 const red={id:'red',material:'PLA Basic',colour:'Red',brand:'Bambu Lab',weight:750,diameter:2.85,variant:'Refill',barcode:'',sku:'',filamentCode:'10200',storage:1};
@@ -14,7 +14,7 @@ function environment(products=[],mode='ADD'){
   class Element{
     constructor(){this.value='';this.hidden=false;this.open=false;this.listeners=new Map();this.style={};this.classList={toggle(){}};}
     addEventListener(type,fn){const list=this.listeners.get(type)||[];list.push(fn);this.listeners.set(type,list);}
-    setAttribute(){}append(){}prepend(){}replaceChildren(){}focus(){}
+    setAttribute(){}append(){}prepend(){}replaceChildren(){}focus(){}click(){this.clicked=true;}
     showModal(){this.open=true;}close(){this.open=false;for(const fn of this.listeners.get('close')||[])fn({});}
   }
   const elements=new Map(),element=id=>{if(!elements.has(id))elements.set(id,new Element());return elements.get(id);};
@@ -51,7 +51,7 @@ test('new barcode prompts for a label, keeps its details, and saves exactly one 
   const e=environment();e.received({code:barcode,text:'SKU: TEST-RED-750 Refill 750 g 2.85 mm',source:'Barcode'});
   assert.equal(e.element('label-link-prompt').hidden,false);assert.equal(e.element('label-link-code').textContent,barcode);
   assert.equal(e.element('product-form').hidden,true);assert.equal(e.element('ok-button').disabled,true);assert.equal(e.bridge.calls.length,0);
-  await e.click('scan-material-label');assert.equal(e.scanner.labelOnly,true);assert.equal(e.scanner.running,true);
+  await e.click('scan-material-label');assert.equal(e.scanner.labelOnly,true);assert.equal(e.scanner.running,false);assert.equal(e.element('photo-input').clicked,true);
   e.received({text:label,source:'Label'});
   assert.equal(e.element('label-link-prompt').hidden,true);assert.equal(e.state.draft.barcode,barcode);
   assert.equal(e.state.draft.sku,'TEST-RED-750');assert.equal(e.state.draft.weight,750);assert.equal(e.state.draft.diameter,'2.85');assert.equal(e.state.draft.variant,'Refill');
@@ -96,11 +96,22 @@ test('a shared filament code cannot discard the package weight when tagging a di
 test('label-only live scan and Read label bypass barcode detection and deliver OCR',async()=>{
   for(const action of ['loop','capture']){
     const results=[],scanner=new LabelScanner({},r=>results.push(r),()=>{},()=>{});
-    scanner.running=true;scanner.held=false;scanner.labelOnly=true;
+    scanner.running=true;scanner.held=false;scanner.labelOnly=true;scanner.autoOcr=true;
     scanner.frame=()=>({toDataURL:()=> 'data:image/jpeg;base64,test'});scanner.decode=()=>{throw new Error('Barcode decoding must not intercept the label step');};scanner.read=async()=>label;
+    scanner.labelFrame=canvas=>canvas;
     if(action==='loop')await scanner.loop(scanner.generation);else await scanner.capture();
     assert.equal(results.length,1);assert.equal(results[0].text,label);assert.equal(results[0].source,'Label');
   }
+});
+test('taking a photo during camera startup cannot leave Starting camera or overwrite the photo result',async()=>{
+ const e=environment();let failStart;e.scanner.start=()=>new Promise((_,reject)=>{failStart=reject;});
+ const starting=e.startCamera();assert.equal(e.element('camera-idle-text').textContent,'Starting camera…');
+ await e.photo({text:label,source:'Label',image:'data:image/jpeg;base64,test'});const progress=e.element('scan-progress').textContent;
+ failStart(new Error('Preview cancelled'));await starting;
+ assert.equal(e.element('scan-progress').textContent,progress);assert.notEqual(e.element('camera-idle-text').textContent,'Starting camera…');assert.equal(e.element('start-camera').disabled,false);assert.equal(e.element('capture-preview').hidden,false);
+});
+test('opening the native photo camera releases the web camera before a file is selected',async()=>{
+ const e=environment();e.scanner.running=true;await e.click('photo-input');assert.equal(e.scanner.running,false);assert.notEqual(e.element('camera-idle-text').textContent,'Starting camera…');
 });
 test('Finish / check save confirms or retries the same operation in one call',async()=>{
  const e=environment([{...red,barcode}]);e.received({code:barcode,source:'Barcode'});e.bridge.loseNextReply=true;await e.click('ok-button');

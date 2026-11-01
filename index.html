@@ -7,7 +7,7 @@
   <title>FilamentTrack · Your filament, accounted for</title>
   <link rel="icon" href="./icon.svg" type="image/svg+xml"><link rel="stylesheet" href="./styles.css">
   <script src="./vendor/zxing.min.js" defer></script><script src="./vendor/tesseract.min.js" defer></script>
-  <script src="./app.js" type="module"></script>
+  <script src="./app.js?v=20261101-scan3" type="module"></script>
 </head>
 <body>
 <header class="topbar"><div class="shell nav">
@@ -35,7 +35,7 @@
   <header class="dialog-header"><div><p id="scan-mode" class="eyebrow">ADDING TO STORAGE</p><h2 id="scan-title">Add one roll</h2></div><div class="dialog-header-right"><span id="session-count" class="session-count">0 added</span><button id="close-scan" class="icon-button" aria-label="Close scanner">×</button></div></header>
   <div class="scan-content">
     <section class="detection-panel" aria-label="Detected filament"><div class="detection-heading"><span id="detection-status" class="badge">READY TO SCAN</span><button id="edit-button" class="text-button" hidden>Edit details</button></div>
-      <div id="detection-placeholder"><h3>Show us the label.</h3><p class="muted">Point at a barcode or printed material label. We’ll hold the result here for you to check.</p></div>
+      <div id="detection-placeholder"><h3>Scan the barcode.</h3><p class="muted">Keep the whole barcode in view. For a material label, tap Read label or take a photo. New barcodes will ask for a label photo.</p></div>
       <div id="detected-product" hidden><h3 id="detected-material"></h3><p id="detected-description"></p><div class="detection-meta"><span id="detected-code"></span><span id="stock-preview"></span></div></div>
       <div id="draft-alert" class="inline-alert" role="status" hidden></div>
       <div id="label-link-prompt" class="inline-alert" role="group" aria-labelledby="label-link-title" hidden><strong id="label-link-title">New barcode — let’s identify this filament.</strong><p>Barcode <span id="label-link-code" class="label-link-code"></span> is kept. Scan the material label on the same box to fill its material, colour and brand.</p><div class="tag-actions"><button id="scan-material-label" type="button" class="button primary">Scan material label</button><button id="tag-manually" type="button" class="button secondary">Enter details manually</button></div><p class="small muted">Check the result above, then confirm. The barcode link and one roll are saved together.</p></div>

@@ -2,6 +2,8 @@
 
 A mobile-first filament inventory app. **Add Filament** and **Use Filament** set the mode. Each accepted scan counts exactly one roll. **OK** saves and finishes; **Scan another box** saves and continues in the same mode.
 
+The personal Firebase app is live at **https://problemassassin.github.io/filament-track/firebase/**. It uses Google sign-in and private Firestore inventory, with no Google connection tab needed. The repository root remains the earlier Sheets frontend until cutover. See `firebase/README.md` for verified deployment status and pending Sheet reporting.
+
 ## Run
 
 Node.js 22 or later; no package installation is needed.
@@ -47,17 +49,17 @@ The optimised Apps Script source reconciles the journal once under its lock, app
 ## New barcode → material label
 
 1. Tap **Add Filament** or **Use Filament** and scan a box barcode.
-2. An unfamiliar barcode with incomplete details shows **Scan material label**. The barcode stays attached to this roll; this step does not change stock.
-3. Scan the printed material label on the same box, or take/upload its photo. This step reads text without stopping again on a barcode. Material, colour and brand fill in for review; already-read SKU, weight, diameter and refill format are retained when absent from the next label. **Read label again** / retaking the label keeps the original barcode. Manual entry remains available.
+2. An unfamiliar barcode with incomplete details shows **Take label photo**. The barcode stays attached to this roll; this step does not change stock.
+3. Take/upload a photo of the printed material label on the same box. This step reads text without stopping again on a barcode. Material, colour and brand fill in for review; already-read SKU, weight, diameter and refill format are retained when absent from the next label. Retaking the label keeps the original barcode. Manual entry remains available.
 4. Review the result, then **OK** or **Scan another box** saves the barcode link and exactly one roll together. Subsequent scans of that saved barcode identify the filament directly. In Use mode the label must match an existing product with stock; an unknown product cannot be deducted.
 
 If a label matches an existing filament whose barcode is empty, confirmation links the code to that product. A different barcode already attached to that product is surfaced for correction rather than silently replaced. Recognition remains a suggestion and can need manual corrections.
 
 ## Recognition
 
-- Live camera uses the rear camera when available. Barcode decoding and periodic OCR read frames; detection holds a still image for review.
+- Live camera uses the rear camera when available and continuously checks barcodes without downloading or running OCR. Tap **Read label** for text recognition, or take/upload a photo. Detection holds a still image for review.
 - The photo path supports native camera capture or selecting an image. Large images are downscaled and internally located paper labels are cropped; alternate orientations are tried.
-- OCR runs in the browser with Tesseract.js. Photos are not sent to Google Sheets or an image-recognition service. The OCR engine/language downloads pinned runtime assets from jsDelivr and Project Naptha on first use.
+- OCR runs in the browser with Tesseract.js. Photos are not sent to Google Sheets or an image-recognition service. The first label uses pinned engine/language downloads from jsDelivr; the compressed English model is about 3 MB and is cached for reuse. Barcode scanning does not need it.
 - Barcode and SKU aliases match exactly. An unfamiliar code can be associated with the material details after review. Product identity includes brand, material, colour, weight, diameter, and spool/refill format.
 - Printed EAN-13 digits read by OCR must pass their checksum. A checksum is not proof of product identity; review still applies.
 - OCR suggestions can be incomplete or incorrect. Missing weight and diameter use clearly disclosed defaults for review. Unknown products cannot be used/deducted.

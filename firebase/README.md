@@ -20,7 +20,7 @@ Initial deployment remains on the Spark plan. No Cloud Functions or paid service
 
 The separate Firebase project is created on Spark. Google sign-in is enabled, and `problemassassin.github.io` is an authorised domain. The default Standard Firestore database is created in `asia-southeast1` (Singapore). The tested `firestore.rules` were published at approximately 4:37 pm Singapore time. The trial entry page and official SDK files load over HTTPS.
 
-Owner sign-in, private allowlist setup, inventory import, the live Add/Use check and main-link cutover remain pending. No live Firebase save latency has been measured yet. This is a personal inventory app; publishing the interface does not make inventory public.
+Owner sign-in, private allowlist setup and opening-stock import are complete. The imported balance was one variety / one roll. A live Add changed 1 → 2 and Use restored 2 → 1; each displayed a measured 0.2-second save confirmation on the desktop browser. A fresh load returned directly to the dashboard and confirmed one roll. Opening-stock import was then closed in the private owner record. These desktop measurements do not establish phone latency. This is a personal inventory app; publishing the interface does not make inventory public. Main-link cutover and automatic Sheet reporting remain pending.
 
 `../apps-script/FirebaseReports.gs` is an optional, locally tested reporting integration. It reads Firestore into separate **Firebase Inventory** and **Firebase Sync** tabs in the owner's existing private spreadsheet, about every five minutes. It does not participate in app saves or modify the original inventory/journal tabs. It is not enabled by merely publishing this source. Deployment requires the owner's private UID Script Property, the additional datastore OAuth scope and owner authorisation. Authentication tokens are obtained at runtime and are never stored in source.
 
@@ -30,4 +30,4 @@ The security tests run against the local Firestore emulator, never a production 
 
 The UI and bridge tests check sign-in-first navigation, restored sessions, sign-out, account-bound pending saves, account-change race handling, CSV import and measured save confirmation. Shared scanner and inventory tests remain in `../tests/`.
 
-Live sign-in, database commissioning, migration and mobile save latency must be verified before treating this trial as production. Local test success alone does not establish live deployment or performance.
+The shared scanner's barcode-first update removes still-image retry loops, requests 1280×720 camera video, bounds camera startup and preview waits, stops the web camera before native photo capture, and starts OCR only for an explicit label read/photo. Unknown codes offer Take label photo. The English model changed from a 10.9 MB file to the SDK's compressed 3.0 MB LSTM model. Physical phone-camera behaviour still requires device verification; local test timings are not phone benchmarks.
