@@ -36,6 +36,15 @@ Google documents that Apps Script can fail with multiple signed-in accounts. The
 
 **Tracker Journal is authoritative.** Each event stores a product snapshot, a fixed +1 or −1 delta, the resulting balance, and a unique request ID. Locking prevents overlapping stock mutations; replaying the same request cannot append a second event. **Tracker Inventory** is the readable materialised view. Do not manually edit the journal or its generated balances. Original tabs remain as a preserved migration baseline.
 
+## New barcode → material label
+
+1. Tap **Add Filament** or **Use Filament** and scan a box barcode.
+2. An unfamiliar barcode with incomplete details shows **Scan material label**. The barcode stays attached to this roll; this step does not change stock.
+3. Scan the printed material label on the same box, or take/upload its photo. This step reads text without stopping again on a barcode. Material, colour and brand fill in for review; already-read SKU, weight, diameter and refill format are retained when absent from the next label. **Read label again** / retaking the label keeps the original barcode. Manual entry remains available.
+4. Review the result, then **OK** or **Scan another box** saves the barcode link and exactly one roll together. Subsequent scans of that saved barcode identify the filament directly. In Use mode the label must match an existing product with stock; an unknown product cannot be deducted.
+
+If a label matches an existing filament whose barcode is empty, confirmation links the code to that product. A different barcode already attached to that product is surfaced for correction rather than silently replaced. Recognition remains a suggestion and can need manual corrections.
+
 ## Recognition
 
 - Live camera uses the rear camera when available. Barcode decoding and periodic OCR read frames; detection holds a still image for review.
