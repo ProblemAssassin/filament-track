@@ -4,21 +4,23 @@ export class GoogleBridge {
   connect(){
     for(const [,p] of this.pending){clearTimeout(p.timer);p.reject(new Error('Connection restarted. Check the previous save before retrying.'));}this.pending.clear();
     this.channel=crypto.randomUUID();this.target=null;this.origin='';
-    const launchedChannel=new URLSearchParams(location.hash.slice(1)).get('bridge');
-    if(launchedChannel&&/^[a-zA-Z0-9-]{16,100}$/.test(launchedChannel)&&window.opener){
+    const parameters=new URLSearchParams(location.hash.slice(1)),launchedChannel=parameters.get('bridge'),expectedOrigin=parameters.get('googleOrigin');
+    if(launchedChannel&&/^[a-zA-Z0-9-]{16,100}$/.test(launchedChannel)&&/^https:\/\/[a-z0-9-]+-script\.googleusercontent\.com$/.test(expectedOrigin||'')){
+      this.expectedOrigin=expectedOrigin;
       this.channel=launchedChannel;this.status('connecting','Connecting through your signed-in Google tab…');
       clearTimeout(this.readyTimer);this.readyTimer=setTimeout(()=>{if(!this.target)this.status('error','Return to your Google connection tab and choose Open connected app. Keep that tab open while scanning.');},22000);
       // The hello contains only a random channel, never inventory or credentials.
-      window.opener.postMessage({type:'tracker-hello',channel:this.channel},'*');return;
+      if(window.opener)window.opener.postMessage({type:'tracker-hello',channel:this.channel},expectedOrigin);return;
     }
     const scriptUrl=getScriptUrl();if(!scriptUrl){this.status('error','Connect this device using your private Google connection URL.');return;}
     this.status('error','Open your Google connection, then choose Open connected app. Keep the Google tab open in the background while scanning.');return;
   }
   message(event){
     if(!/^https:\/\/[a-z0-9-]+-script\.googleusercontent\.com$/.test(event.origin))return;
+    if(event.origin!==this.expectedOrigin)return;
     const d=event.data;
     if(!d||d.channel!==this.channel)return;
-    if(event.source!==window.opener)return;
+    if(this.target&&event.source!==this.target)return;
     if(d.type==='tracker-ready'){
       if(this.target&&event.source!==this.target)return;
       if(d.connectionUrl){try{saveScriptUrl(d.connectionUrl);}catch{}}
