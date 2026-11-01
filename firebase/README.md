@@ -16,6 +16,14 @@ The public web SDK configuration is an application identifier, not a database cr
 
 Initial deployment remains on the Spark plan. No Cloud Functions or paid services are required for these browser transactions.
 
+## Commissioning status — 1 November 2026
+
+The separate Firebase project is created on Spark. Google sign-in is enabled, and `problemassassin.github.io` is an authorised domain. The default Standard Firestore database is created in `asia-southeast1` (Singapore). The tested `firestore.rules` were published at approximately 4:37 pm Singapore time. The trial entry page and official SDK files load over HTTPS.
+
+Owner sign-in, private allowlist setup, inventory import, the live Add/Use check and main-link cutover remain pending. No live Firebase save latency has been measured yet. This is a personal inventory app; publishing the interface does not make inventory public.
+
+`../apps-script/FirebaseReports.gs` is an optional, locally tested reporting integration. It reads Firestore into separate **Firebase Inventory** and **Firebase Sync** tabs in the owner's existing private spreadsheet, about every five minutes. It does not participate in app saves or modify the original inventory/journal tabs. It is not enabled by merely publishing this source. Deployment requires the owner's private UID Script Property, the additional datastore OAuth scope and owner authorisation. Authentication tokens are obtained at runtime and are never stored in source.
+
 ## Verification
 
 The security tests run against the local Firestore emulator, never a production database. They check account isolation, verified-owner access, atomic one-roll updates, idempotent and concurrent retries, barcode/SKU uniqueness, negative-stock rejection, paired event receipts, and the restricted opening-stock import.
