@@ -1,7 +1,7 @@
 import {FirebaseBridge} from './firebase-bridge.js';
 import {readInventoryCsv} from './import-csv.js';
 import {LabelScanner} from '../scanner.js?v=20261101-scan3';
-import {clean,normal,findByCode,labelMatches,mergeScanDetails,parseLabel,validateDraft,csvCell} from '../core.js';
+import {clean,normal,findByCode,labelMatches,mergeScanDetails,parseLabel,validateDraft,csvCell} from '../core.js?v=20261101-weight1';
 const $=id=>document.getElementById(id);
 const state={products:[],events:[],connected:false,loaded:false,mode:'ADD',draft:null,source:'Manual',saving:false,session:0,selectedId:'',raw:'',lastBarcode:'',saveResolved:false,scanDetails:{},readingLabel:false};
 const pendingKey='filament-track-firebase-pending-v1';let pending=null;let toastTimer;

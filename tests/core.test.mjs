@@ -1,6 +1,11 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {parseLabel,findByCode,labelMatches,validateDraft,csvCell,validEan13} from '../core.js';
 const red={id:'p1',material:'PLA Basic',colour:'Red',brand:'Bambu Lab',weight:1000,diameter:1.75,variant:'Refill',barcode:'6975337030270',sku:'A00-R0-1.75-1000-SPLFREE',filamentCode:'10200',storage:1};
+test('a filament code joined to g by OCR is never used as the spool weight',()=>{
+ const read=parseLabel('Bambu Lab PLA Basic Purple Filament Code 10700 g Net Weight 1 kg 1.75 mm');assert.equal(read.weight,1000);assert.equal(read.filamentCode,'10700');
+ assert.equal(parseLabel('Bambu Lab PLA Basic Purple Filament Code 10700 g').weight,'');
+ assert.equal(parseLabel('Bambu Lab PLA Basic Purple Filament Code 10700 g Net Weight 750 g').weight,750);
+});
 test('reads the supplied Bambu label without treating temperature as weight',()=>{const p=parseLabel('Bambu Lab PLA Basic Diameter 1.75 ± 0.03 mm Printing Temp 190 - 230°C Net Weight 1 kg Filament Code 10200 Red');assert.equal(p.material,'PLA Basic');assert.equal(p.colour,'Red');assert.equal(p.weight,1000);assert.equal(p.diameter,'1.75');assert.equal(p.filamentCode,'10200');assert.equal(p.brand,'Bambu Lab');});
 test('barcode and SKU are separate exact aliases, never substring matches',()=>{assert.equal(findByCode([red],red.barcode)?.id,'p1');assert.equal(findByCode([red],red.sku)?.id,'p1');assert.equal(findByCode([red],'prefix-'+red.barcode),null);assert.equal(findByCode([red],'0270'),null);});
 test('ambiguous label matches remain multiple for user review',()=>{const second={...red,id:'p2',barcode:'other',variant:'Spool'};assert.equal(labelMatches([red,second],{brand:'Bambu Lab',material:'PLA Basic',colour:'Red'}).length,2);assert.equal(labelMatches([red,second],{brand:'Bambu Lab',material:'PLA Basic',colour:'Red',variant:'Refill'})[0].id,'p1');});
