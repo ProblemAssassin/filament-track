@@ -1,0 +1,23 @@
+<!doctype html><html lang="en"><head><base target="_top"><meta charset="utf-8"><style>body{font:16px system-ui;background:#101c2c;color:#eef5f6;max-width:620px;margin:8vh auto;padding:24px;line-height:1.6}a,button{display:inline-block;background:#28d7a6;color:#052b24;border:0;border-radius:10px;padding:12px 18px;font:600 16px system-ui;text-decoration:none}small{color:#a4b6c7}#result{white-space:pre-wrap}</style></head><body>
+<h1>FilamentTrack</h1><p>Your private Google Sheets connection.</p><p id="status" role="status">Checking access…</p><p><a href="<?= appUrl ?>" id="open">Open FilamentTrack</a></p><button id="check" type="button">Check connection</button><p id="result"></p><small>Sign in with the Google account that owns the inventory. Your Sheet stays private.</small>
+<script>
+const APP_ORIGIN = <?!= JSON.stringify(appOrigin) ?>;
+const CHANNEL = <?!= JSON.stringify(channel) ?>;
+const embedded = !!CHANNEL;
+function send(value){if(embedded)window.top.postMessage({...value,channel:CHANNEL},APP_ORIGIN);}
+window.addEventListener('message',event=>{
+  if(event.origin!==APP_ORIGIN||event.source!==window.top)return;
+  const data=event.data;
+  if(!data||data.channel!==CHANNEL||data.type!=='tracker-request'||typeof data.id!=='string'||!data.request||!['list','mutate','receipt'].includes(data.request.method))return;
+  google.script.run.withSuccessHandler(result=>send({type:'tracker-response',id:data.id,result})).withFailureHandler(error=>send({type:'tracker-response',id:data.id,error:error.message||'Google Sheets request failed.'})).trackerApi(data.request);
+});
+function check(){
+  document.getElementById('status').textContent='Checking Google Sheets…';
+  google.script.run.withSuccessHandler(result=>{
+    document.getElementById('status').textContent='Connected to your private inventory.';
+    document.getElementById('result').textContent=result.products.length+' product(s) · '+result.products.reduce((n,p)=>n+p.storage,0)+' rolls in storage';
+    send({type:'tracker-ready'});
+  }).withFailureHandler(error=>{document.getElementById('status').textContent=error.message||'Connection failed.';send({type:'tracker-error',error:error.message||'Connection failed.'});}).trackerApi({method:'list'});
+}
+document.getElementById('check').addEventListener('click',check);check();
+</script></body></html>
