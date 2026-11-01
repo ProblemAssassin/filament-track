@@ -42,7 +42,7 @@ Normal confirmation makes one save request and waits for its matching receipt. I
 
 After six seconds, the app shows whether the Google tab acknowledged the request (updated Google launcher required). **Go to Google connection** attempts to focus the existing Google tab; switch to it manually if your phone blocks this. Mobile browsers can pause background tabs. The app continues to require a server receipt before displaying a roll as saved.
 
-The optimised Apps Script source reconciles the journal once under its lock, applies the confirmed append in memory, and updates inventory values in one batch. Header formatting, column sizes and filter setup run during setup or when needed for new products. **This backend optimisation requires deploying the updated Apps Script files; the live private backend is still version 10 until that deployment is completed.**
+The optimised Apps Script source reconciles the journal once under its lock, applies the confirmed append in memory, and updates inventory values in one batch. Header formatting, column sizes and filter setup run during setup or when needed for new products. **The backend optimisation and launcher acknowledgement are live in private deployment version 11. Reopen the Google connection tab, then open a fresh connected app tab to load the update.**
 
 ## New barcode → material label
 
