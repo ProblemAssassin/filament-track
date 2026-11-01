@@ -1,0 +1,53 @@
+# FilamentTrack
+
+A mobile-first filament inventory app. **Add Filament** and **Use Filament** set the mode. Each accepted scan counts exactly one roll. **OK** saves and finishes; **Scan another box** saves and continues in the same mode.
+
+## Run
+
+Node.js 22 or later; no package installation is needed.
+
+```sh
+node tests/serve.mjs
+node --test tests/core.test.mjs tests/backend.test.mjs
+```
+
+For isolated UI tests, use `node tests/serve.mjs --fixture`. The header says **QA fixture · no Sheet writes**. That mode substitutes mock modules only in the local server; GitHub Pages always serves the real modules. `tests/scanner-harness.html` tests recognition on a selected local image without changing inventory.
+
+## Storage and authentication
+
+- GitHub Pages serves the interface over HTTPS.
+- The existing Apps Script project supplies a small authenticated Sheets bridge. Keep its deployment set to **User accessing the web app / Only myself**.
+- The server additionally checks the owner email stored privately in Script Properties by `setupTracker`. There are no OAuth secrets or bearer keys in this repository.
+- The Google Sheet remains private. The app and repository being public does not grant access to inventory.
+- The bridge validates message origins, a random per-load channel, and the responding window. The server permits only bounded inventory reads, receipt lookup, and one-roll mutations.
+- Browser storage retains only an unresolved transaction request, so a network interruption can be checked or retried with the original request ID. Stock is never treated as saved without a server receipt.
+
+## Google setup / updates
+
+1. Preserve a backup of the existing Apps Script files and retain the current deployment ID.
+2. Copy `apps-script/Code.gs` and `apps-script/Index.html` into the existing project.
+3. Set `TRACKER.sheetId`, `TRACKER.appOrigin`, and `TRACKER.appUrl` for the chosen Sheet and frontend. The included values target this app. The loopback origin `http://127.0.0.1:4173` is also allowed for local QA; it still requires owner authentication.
+4. Run `setupTracker` once in the Apps Script editor and review Google's permissions. It stores the owner identity, imports opening stock, and creates **Tracker Journal** and **Tracker Inventory** inside the existing workbook. It does not delete or modify **Filament Inventory** or **Transaction Log**. Re-running setup does not import opening stock twice.
+5. Manage deployments → Edit → New version → Deploy, retaining **User accessing the web app / Only myself**.
+6. Keep `config.js` aligned with the deployment's `/exec` URL. No deployment token is needed.
+7. Open the frontend, sign in to the owning Google account if prompted, then reconnect. A browser that blocks Google's third-party connection may require allowing it for this site. Use the connection panel's top-level Google link for authorisation.
+
+**Tracker Journal is authoritative.** Each event stores a product snapshot, a fixed +1 or −1 delta, the resulting balance, and a unique request ID. Locking prevents overlapping stock mutations; replaying the same request cannot append a second event. **Tracker Inventory** is the readable materialised view. Do not manually edit the journal or its generated balances. Original tabs remain as a preserved migration baseline.
+
+## Recognition
+
+- Live camera uses the rear camera when available. Barcode decoding and periodic OCR read frames; detection holds a still image for review.
+- The photo path supports native camera capture or selecting an image. Large images are downscaled and internally located paper labels are cropped; alternate orientations are tried.
+- OCR runs in the browser with Tesseract.js. Photos are not sent to Google Sheets or an image-recognition service. The OCR engine/language downloads pinned runtime assets from jsDelivr and Project Naptha on first use.
+- Barcode and SKU aliases match exactly. An unfamiliar code can be associated with the material details after review. Product identity includes brand, material, colour, weight, diameter, and spool/refill format.
+- Printed EAN-13 digits read by OCR must pass their checksum. A checksum is not proof of product identity; review still applies.
+- OCR suggestions can be incomplete or incorrect. Missing weight and diameter use clearly disclosed defaults for review. Unknown products cannot be used/deducted.
+- Live camera behaviour still depends on the device, browser and user permission. HEIC images depend on browser decoder support; JPEG/PNG are the reliable photo options.
+
+## Auditing
+
+Tests cover opening-balance migration, idempotency, zero-stock protection, owner access, alias conflicts, request-ID misuse, journal reconciliation, CSV formula injection, label parsing and ambiguous matches. See `AUDIT.md` for observed browser and deployment verification, with fixture and live tests distinguished.
+
+## Dependencies
+
+Vendored client scripts: `@zxing/library` 0.21.3 (Apache-2.0) and `tesseract.js` 6.0.1 (Apache-2.0). Licences are under `vendor/`. OCR worker/core/language assets load on demand as documented above. No paid OCR API is configured.
