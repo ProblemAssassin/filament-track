@@ -17,7 +17,7 @@ For isolated UI tests, use `node tests/serve.mjs --fixture`. The header says **Q
 
 - GitHub Pages serves the interface over HTTPS.
 - The existing Apps Script project supplies a small authenticated Sheets bridge. Keep its deployment set to **User accessing the web app / Only myself**.
-- The server additionally checks the owner email stored privately in Script Properties by `setupTracker`. There are no OAuth secrets or bearer keys in this repository.
+- The server additionally checks the owner email stored privately in Script Properties by `setupTracker`. The Sheet ID is also a private Script Property. Each device stores its Google connection URL in browser storage. There are no private Sheet/deployment identifiers, OAuth secrets or bearer keys in this repository.
 - The Google Sheet remains private. The app and repository being public does not grant access to inventory.
 - The bridge validates message origins, a random per-load channel, and the responding window. The server permits only bounded inventory reads, receipt lookup, and one-roll mutations.
 - Browser storage retains only an unresolved transaction request, so a network interruption can be checked or retried with the original request ID. Stock is never treated as saved without a server receipt.
@@ -26,11 +26,11 @@ For isolated UI tests, use `node tests/serve.mjs --fixture`. The header says **Q
 
 1. Preserve a backup of the existing Apps Script files and retain the current deployment ID.
 2. Copy `apps-script/Code.gs` and `apps-script/Index.html` into the existing project.
-3. Set `TRACKER.sheetId`, `TRACKER.appOrigin`, and `TRACKER.appUrl` for the chosen Sheet and frontend. The included values target this app. The loopback origin `http://127.0.0.1:4173` is also allowed for local QA; it still requires owner authentication.
+3. In Apps Script → Project settings → Script properties, set `TRACKER_SHEET_ID` to the private Sheet ID. Set the public `TRACKER.appOrigin` and `TRACKER.appUrl` for the chosen frontend. The loopback origin `http://127.0.0.1:4173` is also allowed for local QA; it still requires owner authentication.
 4. Run `setupTracker` once in the Apps Script editor and review Google's permissions. It stores the owner identity, imports opening stock, and creates **Tracker Journal** and **Tracker Inventory** inside the existing workbook. It does not delete or modify **Filament Inventory** or **Transaction Log**. Re-running setup does not import opening stock twice.
 5. Manage deployments → Edit → New version → Deploy, retaining **User accessing the web app / Only myself**.
-6. Keep `config.js` aligned with the deployment's `/exec` URL. No deployment token is needed.
-7. Open the frontend, sign in to the owning Google account if prompted, then reconnect. A browser that blocks Google's third-party connection may require allowing it for this site. Use the connection panel's top-level Google link for authorisation.
+6. In the frontend connection panel, paste the deployment's `/exec` URL and choose **Save & connect**. It is saved only in that browser. No deployment token is needed.
+7. Sign in to the owning Google account if prompted, then reconnect. A browser that blocks Google's third-party connection may require allowing it for this site. Use the connection panel's top-level Google link for authorisation. Repeat connection setup on each new device.
 
 **Tracker Journal is authoritative.** Each event stores a product snapshot, a fixed +1 or −1 delta, the resulting balance, and a unique request ID. Locking prevents overlapping stock mutations; replaying the same request cannot append a second event. **Tracker Inventory** is the readable materialised view. Do not manually edit the journal or its generated balances. Original tabs remain as a preserved migration baseline.
 
