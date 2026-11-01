@@ -45,6 +45,8 @@ The material-label photo produced Bambu Lab, PLA Basic, Red and filament code 10
 
 The angled barcode-label photo produced the printed barcode identifier and SKU text. The numeric identifier passed EAN-13 checksum validation. Barcode-symbol decoding did not succeed on that particular angled photograph; the app used its printed-number OCR fallback. The app correctly required material details for this unfamiliar code and did not enable saving incomplete product information.
 
+A separate clean QR fixture was decoded by the actual browser barcode reader to its known test value. This verified the symbol-decoder path independently of OCR; it did not change inventory.
+
 The photographs were processed in the browser. They were not copied into the repository or uploaded to an OCR service.
 
 ## Deployment / security decisions
