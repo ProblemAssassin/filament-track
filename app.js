@@ -1,7 +1,7 @@
 import {GoogleBridge} from './bridge.js';
 import {LabelScanner} from './scanner.js';
 import {clean,findByCode,labelMatches,parseLabel,validateDraft,csvCell} from './core.js';
-import {getScriptUrl,saveScriptUrl} from './config.js';
+import {getScriptUrl,saveScriptUrl,googleAccountChooserUrl} from './config.js';
 const $=id=>document.getElementById(id);
 const state={products:[],events:[],connected:false,loaded:false,mode:'ADD',draft:null,source:'Manual',saving:false,session:0,selectedId:'',raw:'',lastBarcode:'',saveResolved:false};
 const pendingKey='filament-track-pending-v1';let pending=null;let toastTimer;
@@ -19,7 +19,7 @@ function connectionStatus(status,detail){
   $('connection-label').textContent=status==='connected'?'Google Sheet connected':status==='connecting'?'Connecting…':'Connection needed';
   $('connection-dot').className='status-dot '+(state.connected?'connected':status==='error'?'error':'');
   $('connection-detail').textContent=detail;
-  if(state.connected&&getScriptUrl()){$('connection-url').value=getScriptUrl();$('google-connect-link').href=getScriptUrl();}
+  if(state.connected&&getScriptUrl())$('connection-url').value=getScriptUrl();
   if(status==='error'&&!state.loaded)$('inventory-summary').textContent='Connect Google Sheets to load your inventory.';
   $('connection-notice').hidden=status!=='error';$('connection-notice').replaceChildren(node('span',detail));
   if(status==='error'){const button=node('button','Connect Google','button secondary compact');button.addEventListener('click',()=>$('connection-dialog').showModal());$('connection-notice').append(button);}
@@ -203,9 +203,8 @@ for(const id of ['search','material-filter','stock-filter'])$(id).addEventListen
 $('refresh-button').addEventListener('click',refresh);
 $('history-button').addEventListener('click',()=>$('history-dialog').showModal());$('close-history').addEventListener('click',()=>$('history-dialog').close());
 $('connection-button').addEventListener('click',()=>$('connection-dialog').showModal());$('close-connection').addEventListener('click',()=>$('connection-dialog').close());
-$('connection-url').value=getScriptUrl();$('google-connect-link').href=getScriptUrl()||'#';
-$('google-connect-link').addEventListener('click',event=>{try{$('google-connect-link').href=saveScriptUrl($('connection-url').value);}catch(e){event.preventDefault();$('connection-detail').textContent=e.message;}});
-$('reconnect-button').addEventListener('click',()=>{try{const url=saveScriptUrl($('connection-url').value);window.location.assign(url);}catch(e){$('connection-detail').textContent=e.message;}});
+$('connection-url').value=getScriptUrl();
+$('google-connect-link').addEventListener('click',()=>{try{const url=saveScriptUrl($('connection-url').value);window.location.assign(googleAccountChooserUrl(url));}catch(e){$('connection-detail').textContent=e.message;$('connection-url').focus();}});
 $('resolve-pending').onclick=resolvePending;
 $('check-save').addEventListener('click',()=>$('resolve-pending').click());
 $('export-button').addEventListener('click',()=>{
