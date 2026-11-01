@@ -14,7 +14,7 @@ Date: 1 November 2026 (Singapore time).
 
 | Check | Evidence / result |
 | --- | --- |
-| Automated tests | 25 passing tests across core, backend, connection and account-routing suites. |
+| Automated tests | 34 passing tests across core, backend, connection, account-routing and scan-flow suites. |
 | Opening-stock migration | Setup imports the existing records once. Original inventory and transaction tabs remain intact. |
 | Duplicate submission / retry | Replaying a request ID produces one committed event. Reusing it with different content is rejected. |
 | Stock protection | The last roll reaches zero; another Use is rejected. Unknown products cannot be deducted. |
@@ -71,3 +71,9 @@ The photographs were processed in the browser. They were not copied into the rep
 The frontend connection button now opens Google’s account chooser before continuing to the validated private Apps Script deployment. Pasted `/macros/u/5/s/…/exec` links are accepted and normalized to `/macros/s/…/exec`; query parameters and fragments, including session-specific account hints, are removed. Owner-only backend access remains unchanged. No account identity or deployment identifier was added to public source.
 
 Four additional automated checks cover copied-link normalization, the chooser’s continuation target, rejecting unsafe destinations, and browser storage. This update was verified with automated tests and the published source. The signed-in account chooser and return flow were not browser-tested for this update because local browser control was disabled in Work settings. Google’s documented multi-login limitation can still require an Incognito tab signed in only to the owning account.
+
+## New-barcode label-tagging update
+
+An unfamiliar barcode with incomplete product details now shows a dedicated Scan material label prompt. The original barcode stays attached through live label reading, photo upload and label retakes. The label step bypasses barcode decoding so the same symbol cannot intercept it. Detected fields from the two sides are merged; defaults are applied only for review, not as constraints when matching saved products. Confirmation stores the barcode mapping and the single Add/Use operation together using the existing backend API. Known barcodes proceed directly to verification. Unknown Use products remain blocked. Conflicting saved aliases are surfaced instead of discarded or overwritten.
+
+Eight scan-flow tests exercise the actual app handlers with a lightweight DOM and simulated scanner/bridge callbacks, including new/known codes, label photos, retakes, manual fallback, Use, alias conflicts, package-size mismatches and save/continue. They also exercise the actual scanner’s live-loop and Read label branches with controlled frames/OCR to verify barcode bypass. An additional test exercises the actual backend source against mocked Google services to verify atomic tagging, one-roll accounting and retry idempotency. All 34 automated tests pass. No live inventory was changed for this update. Physical camera behaviour and visual layout of the new prompt still require browser/device verification; local browser control was unavailable. The private backend deployment remains version 10.
