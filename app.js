@@ -19,6 +19,7 @@ function connectionStatus(status,detail){
   $('connection-label').textContent=status==='connected'?'Google Sheet connected':status==='connecting'?'Connecting…':'Connection needed';
   $('connection-dot').className='status-dot '+(state.connected?'connected':status==='error'?'error':'');
   $('connection-detail').textContent=detail;
+  if(state.connected&&getScriptUrl()){$('connection-url').value=getScriptUrl();$('google-connect-link').href=getScriptUrl();}
   if(status==='error'&&!state.loaded)$('inventory-summary').textContent='Connect Google Sheets to load your inventory.';
   $('connection-notice').hidden=status!=='error';$('connection-notice').replaceChildren(node('span',detail));
   if(status==='error'){const button=node('button','Connect Google','button secondary compact');button.addEventListener('click',()=>$('connection-dialog').showModal());$('connection-notice').append(button);}
@@ -203,7 +204,7 @@ $('history-button').addEventListener('click',()=>$('history-dialog').showModal()
 $('connection-button').addEventListener('click',()=>$('connection-dialog').showModal());$('close-connection').addEventListener('click',()=>$('connection-dialog').close());
 $('connection-url').value=getScriptUrl();$('google-connect-link').href=getScriptUrl()||'#';
 $('google-connect-link').addEventListener('click',event=>{try{$('google-connect-link').href=saveScriptUrl($('connection-url').value);}catch(e){event.preventDefault();$('connection-detail').textContent=e.message;}});
-$('reconnect-button').addEventListener('click',()=>{try{const url=saveScriptUrl($('connection-url').value);$('google-connect-link').href=url;bridge.connect();$('connection-dialog').close();}catch(e){$('connection-detail').textContent=e.message;}});
+$('reconnect-button').addEventListener('click',()=>{try{const url=saveScriptUrl($('connection-url').value);window.location.assign(url);}catch(e){$('connection-detail').textContent=e.message;}});
 $('resolve-pending').onclick=resolvePending;
 $('check-save').addEventListener('click',()=>$('resolve-pending').click());
 $('export-button').addEventListener('click',()=>{
