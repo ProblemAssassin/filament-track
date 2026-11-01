@@ -8,7 +8,7 @@ Node.js 22 or later; no package installation is needed.
 
 ```sh
 node tests/serve.mjs
-node --test tests/core.test.mjs tests/backend.test.mjs tests/bridge.test.mjs
+node --test tests/*.test.mjs
 ```
 
 For isolated UI tests, use `node tests/serve.mjs --fixture`. The header says **QA fixture · no Sheet writes**. That mode substitutes mock modules only in the local server; GitHub Pages always serves the real modules. `tests/scanner-harness.html` tests recognition on a selected local image without changing inventory.
@@ -30,7 +30,9 @@ For isolated UI tests, use `node tests/serve.mjs --fixture`. The header says **Q
 4. Run `setupTracker` once in the Apps Script editor and review Google's permissions. It stores the owner identity, imports opening stock, and creates **Tracker Journal** and **Tracker Inventory** inside the existing workbook. It does not delete or modify **Filament Inventory** or **Transaction Log**. Re-running setup does not import opening stock twice.
 5. Manage deployments → Edit → New version → Deploy, retaining **User accessing the web app / Only myself**.
 6. Open the deployment's private `/exec` URL, sign in to the owning Google account if prompted, then choose **Open connected app**. The connection URL is passed only to the authenticated client and retained in that browser; it is never part of the public source.
-7. Keep the Google tab open in the background. Bookmark the Google connection URL as your starting point. The frontend's connection panel also lets you save and open that URL on a new device. No deployment token, third-party-cookie exception or public Sheet is needed.
+7. Keep the Google tab open in the background. Bookmark the Google connection URL as your starting point. The frontend's connection panel also lets you paste that URL on a new device and choose **Choose Google account & connect**. It opens Google's account chooser before the private connection. Copied `/u/5/` paths and `authuser` parameters are removed because account indexes differ between browsers. Select the account that owns this inventory; choosing another account does not grant it access. No deployment token, third-party-cookie exception or public Sheet is needed.
+
+Google documents that Apps Script can fail with multiple signed-in accounts. The account chooser helps select the intended account but cannot guarantee a fix for Google's multi-login limitation. If Google still displays “unable to open the file”, open the private connection URL in a Chrome Incognito tab and sign in only to its owning account. See [Google's troubleshooting guide](https://developers.google.com/apps-script/guides/support/troubleshooting#issues_with_multiple_google_accounts).
 
 **Tracker Journal is authoritative.** Each event stores a product snapshot, a fixed +1 or −1 delta, the resulting balance, and a unique request ID. Locking prevents overlapping stock mutations; replaying the same request cannot append a second event. **Tracker Inventory** is the readable materialised view. Do not manually edit the journal or its generated balances. Original tabs remain as a preserved migration baseline.
 
