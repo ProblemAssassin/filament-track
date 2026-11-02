@@ -92,7 +92,7 @@ function chooseProduct(product,aliases={}){
 }
 function displayDraft(matched=false){
   const p=state.draft;if(!p)return;
-  $('detected-material').textContent=p.material||(p.barcode?'New barcode':'Check material');$('detected-description').textContent=[p.colour||'Check colour',p.brand||'Check brand',p.weight?p.weight+' g':'',p.variant&&p.variant!=='Unspecified'?p.variant:''].filter(Boolean).join(' · ');
+  $('detected-material').textContent=p.colour||p.material?[p.colour||'Check colour',p.material||'Check material'].join(' - '):(p.barcode?'New barcode':'Check material');$('detected-description').textContent=[p.brand||'Check brand',p.weight?p.weight+' g':'',p.variant&&p.variant!=='Unspecified'?p.variant:''].filter(Boolean).join(' · ');
   $('detected-code').textContent=p.barcode?'Barcode '+p.barcode:p.sku?'SKU '+p.sku:p.filamentCode?'Filament code '+p.filamentCode:'No code linked';
   const before=Number(p.storage||0);$('stock-preview').textContent='Storage '+before+' → '+(before+(state.mode==='ADD'?1:-1));
   $('detection-placeholder').hidden=true;$('detected-product').hidden=false;$('edit-button').hidden=false;$('detection-status').textContent=matched?'MATCH FOUND · CHECK DETAILS':'CHECK DETECTED DETAILS';$('detection-status').className='badge'+(matched?'':' review');
