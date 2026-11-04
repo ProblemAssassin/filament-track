@@ -5,3 +5,5 @@
 .camera-view>img{position:absolute;inset:0;background:#080f1a}
 .tag-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.tag-actions .button{white-space:normal}.label-link-code{overflow-wrap:anywhere;font-family:ui-monospace,monospace}.detection-meta span{overflow-wrap:anywhere;min-width:0}
 .save-progress{font-size:12px;color:var(--muted);margin-bottom:10px}.save-progress p{margin:0 0 6px}
+.transactions-panel{margin-top:24px}.transactions-table time{font-size:12px;color:var(--muted)}.transactions-table th:nth-child(4),.transactions-table td:nth-child(4){display:table-cell}.transactions-table td:last-child{padding:19px 24px}.transaction-change{font-size:16px;font-weight:650;color:var(--green)}.transaction-change.used{color:var(--amber)}
+@media(max-width:760px){.transactions-table th,.transactions-table td{padding:13px 10px}.transactions-table td:last-child{padding:13px 10px}.transactions-table th{letter-spacing:0}.transactions-table td:first-child{width:84px}.transactions-table time{font-size:10px}.transactions-table td strong{font-size:12px}.transactions-table .sub{font-size:10px}}

@@ -5,9 +5,9 @@
   <meta name="theme-color" content="#101827"><meta name="description" content="Scan a filament label or barcode. Add or use one roll at a time, saved to your private Google Sheet.">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net 'wasm-unsafe-eval'; worker-src 'self' blob: https://cdn.jsdelivr.net; connect-src 'self' https://cdn.jsdelivr.net https://tessdata.projectnaptha.com; img-src 'self' blob: data:; style-src 'self'; font-src 'self'; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'none'">
   <title>FilamentTrack · Your filament, accounted for</title>
-  <link rel="icon" href="./icon.svg" type="image/svg+xml"><link rel="stylesheet" href="./styles.css">
+  <link rel="icon" href="./icon.svg" type="image/svg+xml"><link rel="stylesheet" href="./styles.css?v=20261105-history1">
   <script src="./vendor/zxing.min.js" defer></script><script src="./vendor/tesseract.min.js" defer></script>
-  <script src="./app.js?v=20261102-colour1" type="module"></script>
+  <script src="./app.js?v=20261105-history1" type="module"></script>
 </head>
 <body>
 <header class="topbar"><div class="shell nav">
@@ -28,6 +28,11 @@
     <div class="table-scroll"><table><thead><tr><th scope="col">MATERIAL</th><th scope="col">COLOUR</th><th scope="col" class="count-col">IN STORAGE</th><th scope="col">BRAND / FORMAT</th><th scope="col">LOCATION</th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead><tbody id="inventory-body"></tbody></table></div>
     <div id="empty-state" class="empty" hidden><span aria-hidden="true">◎</span><h3 id="empty-title">Your shelf starts here.</h3><p id="empty-description">Tap Add Filament to scan or enter your first roll.</p></div>
     <div class="panel-footer"><span id="results-count">—</span><span id="last-saved">Google Sheets is the source of truth</span></div>
+  </section>
+  <section class="inventory-panel transactions-panel" aria-labelledby="recent-transactions-title">
+    <div class="panel-heading"><div><h2 id="recent-transactions-title">Latest 10 transactions</h2><p class="muted small">Newest first · updated after each saved roll</p></div></div>
+    <div class="table-scroll"><table class="transactions-table" aria-labelledby="recent-transactions-title"><thead><tr><th scope="col">DATE / TIME</th><th scope="col">FILAMENT</th><th scope="col" class="count-col">CHANGE</th><th scope="col" class="count-col">BALANCE</th></tr></thead><tbody id="recent-transactions-body"></tbody></table></div>
+    <div id="recent-transactions-empty" class="empty"><p>No transactions yet. Your first confirmed roll will appear here.</p></div>
   </section>
   <footer class="footer"><span><span class="tiny-dot"></span> One accepted scan. One roll.</span><span>Photos are processed on your device.</span></footer>
 </main>

@@ -1,6 +1,6 @@
 import {GoogleBridge} from './bridge.js';
 import {LabelScanner} from './scanner.js?v=20261101-scan3';
-import {clean,normal,findByCode,labelMatches,mergeScanDetails,parseLabel,validateDraft,csvCell} from './core.js?v=20261101-weight1';
+import {clean,normal,findByCode,labelMatches,mergeScanDetails,parseLabel,validateDraft,csvCell} from './core.js?v=20261105-history1';
 import {getScriptUrl,saveScriptUrl,googleAccountChooserUrl} from './config.js';
 const $=id=>document.getElementById(id);
 const state={products:[],events:[],connected:false,loaded:false,mode:'ADD',draft:null,source:'Manual',saving:false,session:0,selectedId:'',raw:'',lastBarcode:'',saveResolved:false,scanDetails:{},readingLabel:false};
@@ -8,7 +8,7 @@ const pendingKey='filament-track-pending-v1';let pending=null;let toastTimer;
 let cameraRequest=0;
 try{pending=JSON.parse(localStorage.getItem(pendingKey)||'null');}catch{}
 const fields=['material','colour','brand','weight','diameter','variant','barcode','sku','filamentCode','location'];
-const colours={red:'#e95758',black:'#24292e',white:'#e7e8e3',grey:'#91989d',gray:'#91989d',blue:'#4d8ed4',green:'#53ae84',yellow:'#e3c94f',orange:'#e6a05d',purple:'#a189d5',pink:'#d98fb5',brown:'#9a7054',silver:'#a5b6c1',gold:'#c4a15d'};
+const colours={red:'#e95758',black:'#24292e',white:'#e7e8e3',grey:'#91989d',gray:'#91989d',blue:'#4d8ed4',green:'#53ae84','bambu green':'#53ae84',yellow:'#e3c94f',orange:'#e6a05d',purple:'#a189d5',pink:'#d98fb5',brown:'#9a7054',silver:'#a5b6c1',gold:'#c4a15d'};
 const scanner=new LabelScanner($('camera-video'),received,setProgress,cameraState);
 const bridge=new GoogleBridge(connectionStatus,lateSaveResult);
 function node(tag,text,className){const el=document.createElement(tag);if(text!==undefined)el.textContent=text;if(className)el.className=className;return el;}
@@ -58,10 +58,22 @@ function renderTable(){
   $('results-count').textContent=products.length+' of '+state.products.length+' varieties';
 }
 function renderHistory(){
+  renderRecentTransactions();
   if(!state.events.length){$('history-list').replaceChildren(node('p','No transactions yet. Your first confirmed roll will appear here.','muted'));return;}
   $('history-list').replaceChildren(...state.events.map(e=>{
     const row=node('div',undefined,'history-row'),symbol=node('span',e.delta>=0?'+':'−','history-symbol'+(e.delta<0?' deduct':'')),body=node('div');body.append(node('h3',e.material+' · '+e.colour),node('p',(e.mode==='OPENING'?'Opening stock':e.mode==='ADD'?'Added 1 roll':'Used 1 roll')+' · '+e.source+' · Balance '+e.balance));row.append(symbol,body,node('span',formatTime(e.timestamp),'history-time'));return row;
   }));
+}
+function renderRecentTransactions(){
+  const recent=[...state.events].sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp)).slice(0,10);
+  $('recent-transactions-body').replaceChildren(...recent.map(event=>{
+    const row=node('tr'),when=node('td'),time=node('time',formatTime(event.timestamp));time.dateTime=event.timestamp;when.append(time);
+    const filament=node('td');filament.append(node('strong',event.colour+' - '+event.material),node('span',event.source||'Manual','sub'));
+    const change=node('td',undefined,'count-col'),amount=node('span',(event.delta>0?'+':'')+event.delta,'transaction-change'+(event.delta<0?' used':''));
+    change.append(amount,node('span',event.mode==='OPENING'?'Opening stock':event.mode==='USE'?'Used':'Added','sub'));
+    row.append(when,filament,change,node('td',String(event.balance),'count-col'));return row;
+  }));
+  $('recent-transactions-empty').hidden=recent.length>0;
 }
 function populateExisting(){
   const o=node('option',state.mode==='USE'?'Choose existing filament…':'New filament');o.value='';

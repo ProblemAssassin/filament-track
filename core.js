@@ -23,7 +23,7 @@ export function parseLabel(text) {
     const finish = upper.match(/\b(?:PLA\s+)?(BASIC|MATTE|SILK|TOUGH|GLOW|WOOD|MARBLE|METAL|LITE)\b/);
     if (finish) type += ' ' + finish[1][0] + finish[1].slice(1).toLowerCase();
   }
-  const colours = ['Charcoal Black','Jade White','Sky Blue','Royal Blue','Forest Green','Light Grey','Dark Grey','Light Gray','Dark Gray','Matte Black','Red','Black','White','Grey','Gray','Blue','Green','Yellow','Orange','Purple','Pink','Brown','Beige','Silver','Gold','Cyan','Magenta','Transparent','Natural'];
+  const colours = ['Bambu Green','Charcoal Black','Jade White','Sky Blue','Royal Blue','Forest Green','Light Grey','Dark Grey','Light Gray','Dark Gray','Matte Black','Red','Black','White','Grey','Gray','Blue','Green','Yellow','Orange','Purple','Pink','Brown','Beige','Silver','Gold','Cyan','Magenta','Transparent','Natural'];
   const colour = colours.find(c => new RegExp('\\b'+c.replace(/ /g,'\\s+')+'\\b','i').test(raw)) || '';
   const brands = [['Bambu Lab',/BAMBU(?:\s*LAB)?/i],['Polymaker',/POLYMAKER/i],['eSUN',/\bESUN\b/i],['SUNLU',/\bSUNLU\b/i],['Prusament',/PRUSAMENT/i],['Creality',/CREALITY/i],['Overture',/OVERTURE/i]];
   const brand = brands.find(([,r])=>r.test(raw))?.[0] || '';
