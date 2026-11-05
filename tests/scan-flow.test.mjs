@@ -26,7 +26,10 @@ function environment(products=[],mode='ADD'){
   class Bridge{
     constructor(){this.calls=[];}connect(){}
     async call(request){
-      this.calls.push(request);assert.equal(request.method,'mutate');
+      this.calls.push(request);
+      if(request.method==='receipt')return {ok:true,found:!!this.receipt,event:this.receipt?.event,state:{ok:true,products:flow.state.products,events:flow.state.events,updatedAt:new Date().toISOString()}};
+      assert.equal(request.method,'mutate');
+      if(this.rejectNext){const error=this.rejectNext;this.rejectNext=null;throw error;}
       if(this.receipt?.event.requestId===request.requestId)return this.receipt;
       const p={...request.product,id:request.product.id||'new-product'};
       const previous=flow.state.products.find(x=>x.id===p.id);p.storage=(previous?.storage||0)+(request.mode==='ADD'?1:-1);
@@ -81,6 +84,20 @@ test('label photo and retake keep the box barcode even if OCR reads a different 
 test('a new barcode is never silently discarded when a matching product has a different saved barcode',async()=>{
   const e=environment([{...red,barcode:'OTHER-SAVED-CODE'}]);e.received({code:barcode,source:'Barcode'});await e.click('scan-material-label');e.received({text:label,source:'Label'});
   assert.equal(e.state.draft.barcode,barcode);assert.equal(e.element('ok-button').disabled,true);assert.match(e.element('draft-alert').textContent,/different barcode/);assert.equal(e.bridge.calls.length,0);
+});
+test('Firebase can link a second barcode to a matching filament and later recognise its alias',async()=>{
+ const e=environment([{...red,barcode:'OTHER-SAVED-CODE'}]);e.bridge.multipleBarcodes=true;
+ e.received({code:barcode,source:'Barcode'});await e.click('scan-material-label');e.received({text:label,source:'Label'});
+ assert.equal(e.state.selectedId,'red');assert.equal(e.state.draft.barcode,barcode);assert.equal(e.element('ok-button').disabled,false);
+ await e.click('ok-button');assert.equal(e.bridge.calls.length,1);assert.equal(e.bridge.calls[0].product.id,'red');assert.equal(e.bridge.calls[0].product.barcode,barcode);
+ const known=environment([{...red,barcode:'OTHER-SAVED-CODE',aliases:[barcode,'THIRD-CODE']}]);known.bridge.multipleBarcodes=true;known.received({code:barcode,source:'Barcode'});
+ assert.equal(known.state.selectedId,'red');assert.equal(known.element('label-link-prompt').hidden,true);assert.equal(known.element('ok-button').disabled,false);
+});
+test('a definite rejection clears the pending save only after confirming there is no receipt',async()=>{
+ const e=environment([{...red,barcode}]);e.received({code:barcode,source:'Barcode'});
+ e.bridge.rejectNext=Object.assign(new Error('This barcode is already linked to another filament.'),{serverRejected:true});
+ await e.click('ok-button');assert.equal(e.bridge.calls.length,2);assert.equal(e.bridge.calls[1].method,'receipt');assert.equal(e.bridge.calls[0].requestId,e.bridge.calls[1].requestId);
+ assert.equal(e.element('pending-notice').hidden,true);assert.equal(e.state.products[0].storage,1);assert.equal(e.element('ok-button').disabled,false);
 });
 test('manual fallback retains the new barcode and permits reviewed details',async()=>{
   const e=environment();e.received({code:barcode,source:'Barcode'});await e.click('tag-manually');

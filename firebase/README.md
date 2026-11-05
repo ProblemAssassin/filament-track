@@ -4,6 +4,8 @@ This is a separate trial of the FilamentTrack frontend with Firebase Authenticat
 
 Entry flow: Sign in with Google → inventory dashboard. Saved sessions load the dashboard directly. The account menu includes Switch Google account and Sign out. Each confirmed Add or Use changes stock by exactly one roll.
 
+Several barcodes can point to the same filament identity (brand, material, colour, weight, diameter and format). Scan an unfamiliar code, read its label or select the existing filament, then confirm one Add or Use. Its code is linked in that same atomic transaction. The original primary barcode is retained, and all linked codes remain recognisable and searchable after a reload. A code cannot be reassigned to another filament. SKU and filament-code conflicts still require review. The legacy Sheets frontend retains its original single-barcode restrictions.
+
 ## Private setup
 
 The public web SDK configuration is an application identifier, not a database credential. Do not add service-account keys, owner email addresses, user IDs, or private spreadsheet links to this repository.

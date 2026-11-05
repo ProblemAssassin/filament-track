@@ -4,7 +4,7 @@ import {createRequire} from 'node:module';
 import fs from 'node:fs';
 import crypto from 'node:crypto';
 import {FirestoreStore,digest} from '../store.js';
-import {keyFor} from '../../core.js';
+import {keyFor,findByCode} from '../../core.js';
 const require=createRequire(process.env.FIREBASE_QA_PACKAGE||import.meta.url);
 const sdk=require('firebase/firestore');
 const {initializeTestEnvironment,assertFails,assertSucceeds}=require('@firebase/rules-unit-testing');
@@ -52,6 +52,32 @@ test('barcode and SKU aliases cannot be attached to a second filament',async()=>
  await assert.rejects(store.mutate(operation({...product,colour:'Blue'})),/already linked/);
  await assert.rejects(store.mutate(operation({...product,colour:'Blue',barcode:'OTHER'})),/already linked/);
  assert.equal((await store.list()).products.length,1);
+});
+test('multiple barcodes share one stock balance and remain recognisable after reload',async()=>{
+ const first=await store.mutate(operation()),saved=first.state.products[0];
+ const pending=operation({...saved,barcode:'SECOND-BOX-CODE'});
+ const second=await store.mutate(pending);assert.equal(second.state.products.length,1);assert.equal(second.state.products[0].storage,2);assert.equal(second.state.products[0].barcode,product.barcode);
+ assert.equal(findByCode(second.state.products,'SECOND-BOX-CODE')?.id,saved.id);
+ await store.mutate(pending);assert.equal((await store.list()).products[0].storage,2);
+ const third=await store.mutate(operation({...saved,barcode:'THIRD-BOX-CODE'}));assert.equal(third.state.products[0].storage,3);
+ const freshStore=new FirestoreStore(db,'owner',sdk),fresh=await freshStore.list();
+ for(const code of [product.barcode,'SECOND-BOX-CODE','THIRD-BOX-CODE'])assert.equal(findByCode(fresh.products,code)?.id,saved.id);
+ await freshStore.mutate(operation({...fresh.products[0],barcode:'SECOND-BOX-CODE'},'USE'));
+ assert.equal((await freshStore.list()).products[0].storage,2);assert.equal((await freshStore.list()).events.length,4);
+ await freshStore.mutate(operation({...fresh.products[0],barcode:'FOURTH-BOX-CODE'},'USE'));
+ const final=await freshStore.list();assert.equal(final.products[0].storage,1);assert.equal(findByCode(final.products,'FOURTH-BOX-CODE')?.id,saved.id);
+});
+test('an alias cannot be linked without a fresh stock transaction or reassigned',async()=>{
+ const saved=await store.mutate(operation()),id=saved.state.products[0].id;
+ await assertFails(sdk.setDoc(store.ref('codes',await digest('UNPAIRED')),{value:'UNPAIRED',productId:id}));
+ await assertFails(sdk.updateDoc(store.ref('codes',await digest(product.barcode)),{productId:'other'}));
+ await assert.rejects(store.mutate(operation({...product,colour:'Blue',sku:'BLUE-SKU'})),error=>error.serverRejected===true&&/already linked/.test(error.message));
+ assert.equal((await store.list()).products.length,1);
+});
+test('a known validation failure is definite and leaves no receipt or stock change',async()=>{
+ const saved=await store.mutate(operation()),request=operation({...saved.state.products[0],sku:'WRONG-SKU'});
+ await assert.rejects(store.mutate(request),error=>error.serverRejected===true&&/different sku/.test(error.message));
+ const receipt=await store.receipt(request.requestId);assert.equal(receipt.found,false);assert.equal(receipt.state.products[0].storage,1);
 });
 test('direct writes cannot change stock without a new paired receipt',async()=>{
  const saved=await store.mutate(operation()),ref=store.ref('products',saved.state.products[0].id);

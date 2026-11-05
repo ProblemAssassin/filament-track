@@ -107,3 +107,11 @@ The actual supplied Bambu barcode JPEG decoded as `6975337030270` through the co
 ## Label weight parsing correction — 1 November 2026
 
 OCR can join a filament colour code to a neighbouring `g` unit. The parser now excludes a number matching an explicitly detected filament/colour code when choosing spool weight, and continues looking for a separate stated weight. A regression test covers a joined code with a separate 1 kg weight, a 750 g weight, and no independent weight. Missing weight still goes through the existing review/default flow. Both app entry points use a new versioned parser import. The 70 source, UI, bridge and report tests pass; database rules are unchanged.
+
+## Multiple barcode links and pending recovery — 5 November 2026
+
+Firebase now keeps the original primary barcode and adds further codes as unique reservations pointing to the same product. List loads code reservations alongside products and receipts; returned aliases support immediate recognition and search, including after reopening. Linking a new barcode happens in the same transaction as the confirmed one-roll Add or Use. Rules require a fresh matching product/event pair for a new code, forbid reassignment and retain verified-owner isolation. Existing products, receipts and request hashes need no migration.
+
+Intentional validation errors now carry a definite-rejection marker. The frontend clears a rejected pending operation only after checking that no receipt exists; uncertain network failures retain the original request ID for a safe retry. The user must reload the updated app on the device holding a pending request and use Finish / check save. No pending phone storage or live stock was edited during this release.
+
+The 13 local Firestore emulator tests cover multiple barcode recognition after reload, Add and Use linking, primary barcode preservation, repeat-safe requests, rejected reassignment, aliases without a paired transaction, and existing isolation/stock checks. Shared UI tests cover selecting an existing filament for a second code and receipt-checked clearing of a rejected pending save.

@@ -5,7 +5,7 @@ export function validEan13(value){if(!/^\d{13}$/.test(value))return false;let su
 export function findByCode(products, code) {
   const n = normal(code);
   if (!n) return null;
-  return products.find(p => [p.barcode,p.sku,p.id].some(v => normal(v) === n)) || null;
+  return products.find(p => [p.barcode,p.sku,p.id,...(Array.isArray(p.aliases)?p.aliases:[])].some(v => normal(v) === n)) || null;
 }
 export function mergeScanDetails(previous, detected, barcode='') {
   const merged={...previous};

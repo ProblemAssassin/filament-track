@@ -2,10 +2,11 @@ import {initializeApp} from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-
 import {getAuth,onAuthStateChanged,setPersistence,browserLocalPersistence,GoogleAuthProvider,signInWithPopup,signOut} from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js';
 import * as firestore from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js';
 import {firebaseConfig} from './firebase-config.js';
-import {FirestoreStore} from './store.js';
+import {FirestoreStore} from './store.js?v=20261105-codes1';
 
 export class FirebaseBridge{
   constructor(status,lateResult=()=>{}){
+    this.multipleBarcodes=true;
     const app=initializeApp(firebaseConfig);this.auth=getAuth(app);this.db=firestore.getFirestore(app);
     this.status=status;this.lateResult=lateResult;this.user=null;this.store=null;this.epoch=0;this.owner=null;
   }

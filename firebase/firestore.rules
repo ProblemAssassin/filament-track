@@ -65,9 +65,9 @@ service cloud.firestore {
     match /users/{uid}/codes/{id} {
       allow read: if owner(uid);
       allow create: if owner(uid) && request.resource.data.keys().hasOnly(['value','productId'])
-        && text(request.resource.data.value,120) && id==digest(canonical(request.resource.data.value))
-        && (canonical(getAfter(/databases/$(database)/documents/users/$(uid)/products/$(request.resource.data.productId)).data.barcode)==request.resource.data.value
-          || canonical(getAfter(/databases/$(database)/documents/users/$(uid)/products/$(request.resource.data.productId)).data.sku)==request.resource.data.value);
+        && text(request.resource.data.value,120) && request.resource.data.value.size()>0
+        && request.resource.data.value==canonical(request.resource.data.value) && id==digest(request.resource.data.value)
+        && newEvent(uid,request.resource.data.productId,getAfter(/databases/$(database)/documents/users/$(uid)/products/$(request.resource.data.productId)).data);
       allow update: if owner(uid) && request.resource.data==resource.data;
       allow delete: if false;
     }

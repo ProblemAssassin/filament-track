@@ -1,7 +1,7 @@
-import {FirebaseBridge} from './firebase-bridge.js';
+import {FirebaseBridge} from './firebase-bridge.js?v=20261105-codes1';
 import {readInventoryCsv} from './import-csv.js';
 import {LabelScanner} from '../scanner.js?v=20261101-scan3';
-import {clean,normal,findByCode,labelMatches,mergeScanDetails,parseLabel,validateDraft,csvCell} from '../core.js?v=20261105-history1';
+import {clean,normal,findByCode,labelMatches,mergeScanDetails,parseLabel,validateDraft,csvCell} from '../core.js?v=20261105-codes1';
 const $=id=>document.getElementById(id);
 const state={products:[],events:[],connected:false,loaded:false,mode:'ADD',draft:null,source:'Manual',saving:false,session:0,selectedId:'',raw:'',lastBarcode:'',saveResolved:false,scanDetails:{},readingLabel:false};
 const pendingKey='filament-track-firebase-pending-v1';let pending=null;let toastTimer;
@@ -50,7 +50,7 @@ function render(){
 }
 function renderTable(){
   const query=$('search').value.toLowerCase().trim(),material=$('material-filter').value,stock=$('stock-filter').value;
-  const products=state.products.filter(p=>(!material||p.material===material)&&(!stock||(stock==='low'?p.storage===1:p.storage===0))&&(!query||[p.material,p.colour,p.brand,p.barcode,p.sku,p.filamentCode,p.location].join(' ').toLowerCase().includes(query))).sort((a,b)=>a.material.localeCompare(b.material)||a.colour.localeCompare(b.colour));
+  const products=state.products.filter(p=>(!material||p.material===material)&&(!stock||(stock==='low'?p.storage===1:p.storage===0))&&(!query||[p.material,p.colour,p.brand,p.barcode,p.sku,p.filamentCode,p.location,...(p.aliases||[])].join(' ').toLowerCase().includes(query))).sort((a,b)=>a.material.localeCompare(b.material)||a.colour.localeCompare(b.colour));
   $('inventory-body').replaceChildren(...products.map(p=>{
     const row=node('tr'),materialCell=node('td');materialCell.append(node('strong',p.material),node('span',p.weight+' g · '+p.diameter+' mm','sub'));row.append(materialCell);
     const colourCell=node('td'),name=node('span',p.colour,'colour-name'),dot=node('span',undefined,'colour-dot');dot.style.background=colours[p.colour.toLowerCase()]||'#7f8fa6';dot.setAttribute('aria-hidden','true');name.prepend(dot);colourCell.append(name);row.append(colourCell);
@@ -116,7 +116,9 @@ function displayDraft(matched=false){
 function setAlert(message){$('draft-alert').textContent=message;$('draft-alert').hidden=!message;}
 function aliasConflict(product){
   const existing=state.products.find(p=>p.id===product?.id);if(!existing)return '';
-  const field=['barcode','sku','filamentCode'].find(f=>existing[f]&&product[f]&&normal(existing[f])!==normal(product[f]));
+  const linked=findByCode(state.products,product.barcode);
+  if(linked&&linked.id!==existing.id)return 'This barcode is already linked to another filament. Check the scanned code.';
+  const field=(bridge.multipleBarcodes?['sku','filamentCode']:['barcode','sku','filamentCode']).find(f=>existing[f]&&product[f]&&normal(existing[f])!==normal(product[f]));
   return field?'This filament already has a different '+field+'. Check the scanned code or choose a separate filament.':'';
 }
 function prepareLabelScan(){
